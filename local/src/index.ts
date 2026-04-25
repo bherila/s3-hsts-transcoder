@@ -1,21 +1,16 @@
 import "dotenv/config";
-import {
-  createLogger,
-  createS3Client,
-  loadConfig,
-  runOnce,
-  VERSION,
-} from "@s3-hsts-transcoder/lib";
+import { createLogger, loadConfig, runOnce, VERSION } from "@s3-hsts-transcoder/lib";
 
 async function main(): Promise<void> {
   const config = loadConfig("local");
   const logger = createLogger(config.logLevel);
-  logger.info("transcoder starting", { platform: "local", lib: VERSION });
+  logger.info("transcoder starting", {
+    platform: "local",
+    lib: VERSION,
+    pairs: config.pairs.length,
+  });
 
-  const sourceClient = createS3Client(config.source);
-  const destClient = createS3Client(config.dest);
-
-  const summary = await runOnce({ config, sourceClient, destClient, logger });
+  const summary = await runOnce({ config, logger });
   if (summary.failed > 0) process.exitCode = 1;
 }
 

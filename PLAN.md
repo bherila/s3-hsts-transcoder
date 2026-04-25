@@ -179,18 +179,49 @@ Sources: [AWS Lambda quotas](https://docs.aws.amazon.com/lambda/latest/dg/gettin
 
 ## Configuration (env vars)
 
+Bucket pairs are configured one of three ways, in priority order:
+
+1. `BUCKETS_CONFIG_FILE` — path to a JSON file with an array of pairs.
+2. `BUCKETS_CONFIG` — JSON literal with an array of pairs.
+3. `SOURCE_*` / `DEST_*` env vars — convenient single-pair fallback.
+
+Each pair JSON object:
+
+```jsonc
+{
+  "source": {
+    "bucket": "videos_source",
+    "endpoint": "https://<account>.r2.cloudflarestorage.com",
+    "prefix": "uploads/",                // optional
+    "accessKeyId":     "...",            // bucket-level credentials (optional)
+    "secretAccessKey": "...",
+    "region":          "auto"            // optional
+  },
+  "dest":   { "bucket": "videos_hsts",   "endpoint": "..." },
+  "accessKeyId":     "...",              // pair-level credentials (optional)
+  "secretAccessKey": "...",
+  "region":          "auto"
+}
+```
+
+**Credential cascade per bucket:** `bucket.accessKeyId` → `pair.accessKeyId` → env var (`SOURCE_ACCESS_KEY_ID` for source side, `DEST_ACCESS_KEY_ID` for dest side). Same for `secretAccessKey` and `region`.
+
+**Overlap validation:** startup refuses to run if any source bucket overlaps with any destination bucket. Two buckets overlap when they share endpoint + bucket name AND one's prefix is a prefix of the other (including the empty prefix). Different endpoints with the same bucket name are *not* overlap. Source-vs-source and dest-vs-dest are intentionally allowed.
+
 | Var                        | Required | Default          | Description                                                              |
 |----------------------------|:--------:|------------------|--------------------------------------------------------------------------|
-| `SOURCE_BUCKET`            | yes      | —                | Source bucket name                                                       |
-| `SOURCE_ENDPOINT`          | yes      | —                | S3 endpoint URL (R2: `https://<account>.r2.cloudflarestorage.com`)       |
-| `SOURCE_ACCESS_KEY_ID`     | yes      | —                |                                                                          |
-| `SOURCE_SECRET_ACCESS_KEY` | yes      | —                |                                                                          |
+| `BUCKETS_CONFIG_FILE`      | no       | —                | Path to JSON file containing pair array                                  |
+| `BUCKETS_CONFIG`           | no       | —                | JSON literal containing pair array                                       |
+| `SOURCE_BUCKET`            | †        | —                | Source bucket name (single-pair fallback)                                |
+| `SOURCE_ENDPOINT`          | †        | —                | S3 endpoint URL (R2: `https://<account>.r2.cloudflarestorage.com`)       |
+| `SOURCE_ACCESS_KEY_ID`     | †        | —                | Also acts as env-level fallback in BUCKETS_CONFIG                        |
+| `SOURCE_SECRET_ACCESS_KEY` | †        | —                | Also env-level fallback                                                  |
 | `SOURCE_REGION`            | no       | `auto`           |                                                                          |
-| `SOURCE_PREFIX`            | no       | ``               | Limit scan to this prefix                                                |
-| `DEST_BUCKET`              | yes      | —                |                                                                          |
-| `DEST_ENDPOINT`            | yes      | —                |                                                                          |
-| `DEST_ACCESS_KEY_ID`       | yes      | —                |                                                                          |
-| `DEST_SECRET_ACCESS_KEY`   | yes      | —                |                                                                          |
+| `SOURCE_PREFIX`            | no       | ``               | Limit scan to this prefix (single-pair fallback only)                    |
+| `DEST_BUCKET`              | †        | —                |                                                                          |
+| `DEST_ENDPOINT`            | †        | —                |                                                                          |
+| `DEST_ACCESS_KEY_ID`       | †        | —                | Env-level fallback                                                       |
+| `DEST_SECRET_ACCESS_KEY`   | †        | —                | Env-level fallback                                                       |
 | `DEST_REGION`              | no       | `auto`           |                                                                          |
 | `HLS_LADDER`               | no       | (built-in)       | JSON array overriding ABR ladder                                         |
 | `MAX_RUNTIME_SECONDS`      | no       | platform default | Self-imposed runtime budget ceiling                                      |
@@ -201,7 +232,9 @@ Sources: [AWS Lambda quotas](https://docs.aws.amazon.com/lambda/latest/dg/gettin
 | `MAX_CONCURRENCY`          | no       | `1`              | Source files processed in parallel within one run                        |
 | `LOG_LEVEL`                | no       | `info`           | `debug` / `info` / `warn` / `error`                                      |
 
-`.env.sample` files in each entrypoint document this.
+† Required when neither `BUCKETS_CONFIG_FILE` nor `BUCKETS_CONFIG` is set.
+
+`.env.sample` (in `local/`) documents the full set with examples.
 
 ## Per-entrypoint specifics
 

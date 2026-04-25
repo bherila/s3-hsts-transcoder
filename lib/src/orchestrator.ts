@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import type { Config, LadderRung } from "./config.js";
+import type { BucketPair, Config, LadderRung } from "./config.js";
 import { byIdPrefix, formatContentId, masterPlaylistKey } from "./contentId.js";
 import { deleteByIdDirectory, transcodedOutputExists } from "./dest.js";
 import { downloadAndHash } from "./download.js";
@@ -30,14 +30,13 @@ import {
   type SourceMapping,
 } from "./mapping.js";
 import { writeMetadata, type OutputMetadata } from "./metadata.js";
+import { createS3Client } from "./s3.js";
 import { scanSource, type SourceObject, type ScanOptions } from "./scanner.js";
 import { uploadDirectory } from "./uploader.js";
 import { VERSION } from "./version.js";
 
 export interface OrchestratorOptions {
   config: Config;
-  sourceClient: S3Client;
-  destClient: S3Client;
   logger: Logger;
 }
 
@@ -48,31 +47,115 @@ export interface RunSummary {
   busy: number;
   failed: number;
   durationMs: number;
-  acquiredLock: boolean;
+  pairsProcessed: number;
+  totalPairs: number;
 }
 
 /**
- * Single transcoding pass: acquire global lock, scan source bucket, process
- * each unprocessed source until budget runs out, release lock.
+ * Runs all configured bucket pairs sequentially, sharing the runtime budget.
+ * Each pair acquires its own global lock on its destination bucket; lock
+ * collisions skip that pair's run, not subsequent pairs.
  */
 export async function runOnce(opts: OrchestratorOptions): Promise<RunSummary> {
-  const { config, sourceClient, destClient, logger } = opts;
+  const { config, logger } = opts;
   const startedAt = Date.now();
 
   const lockTtl = computeLockTtlSeconds(config.maxRuntimeSeconds, config.lockTtlMultiplier);
   const budget = computeBudgetSeconds(config.maxRuntimeSeconds, config.budgetMultiplier);
-  const budgetExpiresAt = startedAt + budget * 1000;
+  const budgetEndsAt = startedAt + budget * 1000;
+
+  let processed = 0;
+  let cached = 0;
+  let deduped = 0;
+  let busy = 0;
+  let failed = 0;
+  let pairsProcessed = 0;
+
+  for (let i = 0; i < config.pairs.length; i++) {
+    const pair = config.pairs[i]!;
+    if (Date.now() > budgetEndsAt) {
+      logger.info("budget exhausted before processing remaining pairs", {
+        completedPairs: i,
+        totalPairs: config.pairs.length,
+      });
+      break;
+    }
+
+    const sourceClient = createS3Client(pair.source);
+    const destClient = createS3Client(pair.dest);
+
+    try {
+      const result = await runPair({
+        pair, config, logger,
+        sourceClient, destClient,
+        lockTtlSeconds: lockTtl,
+        budgetEndsAt,
+        pairIndex: i,
+      });
+      processed += result.processed;
+      cached += result.cached;
+      deduped += result.deduped;
+      busy += result.busy;
+      failed += result.failed;
+      if (result.acquiredLock) pairsProcessed++;
+    } catch (err) {
+      failed++;
+      logger.error("pair processing failed", {
+        pairIndex: i,
+        sourceBucket: pair.source.bucket,
+        destBucket: pair.dest.bucket,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      sourceClient.destroy();
+      destClient.destroy();
+    }
+  }
+
+  const summary: RunSummary = {
+    processed, cached, deduped, busy, failed,
+    durationMs: Date.now() - startedAt,
+    pairsProcessed,
+    totalPairs: config.pairs.length,
+  };
+  logger.info("run complete", { ...summary });
+  return summary;
+}
+
+interface PairResult {
+  processed: number;
+  cached: number;
+  deduped: number;
+  busy: number;
+  failed: number;
+  acquiredLock: boolean;
+}
+
+async function runPair(args: {
+  pair: BucketPair;
+  config: Config;
+  logger: Logger;
+  sourceClient: S3Client;
+  destClient: S3Client;
+  lockTtlSeconds: number;
+  budgetEndsAt: number;
+  pairIndex: number;
+}): Promise<PairResult> {
+  const {
+    pair, config, logger, sourceClient, destClient,
+    lockTtlSeconds, budgetEndsAt, pairIndex,
+  } = args;
 
   const lock = await acquireLock({
     client: destClient,
-    bucket: config.dest.bucket,
+    bucket: pair.dest.bucket,
     platform: config.platform,
     maxRuntimeSeconds: config.maxRuntimeSeconds,
-    lockTtlSeconds: lockTtl,
+    lockTtlSeconds,
     logger,
   });
   if (!lock) {
-    return summarize(startedAt, false, 0, 0, 0, 0, 0);
+    return { processed: 0, cached: 0, deduped: 0, busy: 0, failed: 0, acquiredLock: false };
   }
 
   let processed = 0;
@@ -82,19 +165,27 @@ export async function runOnce(opts: OrchestratorOptions): Promise<RunSummary> {
   let failed = 0;
 
   try {
-    const scanOpts: ScanOptions = {};
-    if (config.source.prefix) scanOpts.prefix = config.source.prefix;
+    logger.info("starting pair", {
+      pairIndex,
+      sourceBucket: pair.source.bucket,
+      destBucket: pair.dest.bucket,
+      ...(pair.source.prefix ? { sourcePrefix: pair.source.prefix } : {}),
+    });
 
-    for await (const source of scanSource(sourceClient, config.source.bucket, scanOpts)) {
-      if (Date.now() > budgetExpiresAt) {
-        logger.info("budget exhausted; exiting current run", {
-          processed, cached, deduped, busy, failed,
+    const scanOpts: ScanOptions = {};
+    if (pair.source.prefix) scanOpts.prefix = pair.source.prefix;
+
+    for await (const source of scanSource(sourceClient, pair.source.bucket, scanOpts)) {
+      if (Date.now() > budgetEndsAt) {
+        logger.info("budget exhausted in pair", {
+          pairIndex, processed, cached, deduped, busy, failed,
         });
         break;
       }
-
       try {
-        const result = await processSource({ source, config, sourceClient, destClient, logger });
+        const result = await processSource({
+          source, pair, config, sourceClient, destClient, logger,
+        });
         if (result === "transcoded") processed++;
         else if (result === "deduped") deduped++;
         else if (result === "cached") cached++;
@@ -102,6 +193,7 @@ export async function runOnce(opts: OrchestratorOptions): Promise<RunSummary> {
       } catch (err) {
         failed++;
         logger.error("source processing failed", {
+          pairIndex,
           sourceKey: source.key,
           error: err instanceof Error ? err.message : String(err),
           stack: err instanceof Error ? err.stack : undefined,
@@ -112,40 +204,23 @@ export async function runOnce(opts: OrchestratorOptions): Promise<RunSummary> {
     await lock.release();
   }
 
-  const summary = summarize(startedAt, true, processed, cached, deduped, busy, failed);
-  logger.info("run complete", { ...summary });
-  return summary;
-}
-
-function summarize(
-  startedAt: number,
-  acquiredLock: boolean,
-  processed: number,
-  cached: number,
-  deduped: number,
-  busy: number,
-  failed: number,
-): RunSummary {
-  return {
-    processed, cached, deduped, busy, failed,
-    durationMs: Date.now() - startedAt,
-    acquiredLock,
-  };
+  return { processed, cached, deduped, busy, failed, acquiredLock: true };
 }
 
 type ProcessResult = "transcoded" | "deduped" | "cached" | "lease-busy";
 
 async function processSource(args: {
   source: SourceObject;
+  pair: BucketPair;
   config: Config;
   sourceClient: S3Client;
   destClient: S3Client;
   logger: Logger;
 }): Promise<ProcessResult> {
-  const { source, config, sourceClient, destClient, logger } = args;
+  const { source, pair, config, sourceClient, destClient, logger } = args;
 
   // 1. Mapping cache check.
-  const existing = await readMapping(destClient, config.dest.bucket, source.key);
+  const existing = await readMapping(destClient, pair.dest.bucket, source.key);
   if (isCachedMapping(existing, { etag: source.etag, size: source.size })) {
     logger.debug("mapping cache hit", { sourceKey: source.key });
     return "cached";
@@ -158,7 +233,7 @@ async function processSource(args: {
     // 2. Download + hash.
     logger.info("downloading", { sourceKey: source.key, sizeBytes: source.size });
     const { sha256, bytes } = await downloadAndHash(
-      sourceClient, config.source.bucket, source.key, localSource,
+      sourceClient, pair.source.bucket, source.key, localSource,
     );
     if (bytes !== source.size) {
       logger.warn("downloaded size differs from listing", {
@@ -168,16 +243,16 @@ async function processSource(args: {
     const contentId = formatContentId("sha256", sha256);
 
     // 3. Byte-hash dedup.
-    if (await transcodedOutputExists(destClient, config.dest.bucket, contentId)) {
+    if (await transcodedOutputExists(destClient, pair.dest.bucket, contentId)) {
       logger.info("byte-hash dedup hit", { sourceKey: source.key, contentId });
-      await writeMapping(destClient, config.dest.bucket, buildMapping(source, contentId));
+      await writeMapping(destClient, pair.dest.bucket, buildMapping(source, contentId));
       return "deduped";
     }
 
     // 4. Per-video lease.
     const lease = await acquireLease({
       client: destClient,
-      bucket: config.dest.bucket,
+      bucket: pair.dest.bucket,
       contentId,
       platform: config.platform,
       maxRuntimeSeconds: config.maxRuntimeSeconds,
@@ -199,16 +274,16 @@ async function processSource(args: {
         hasAudio: probe.hasAudio,
       });
 
-      // 6. Effective ladder: skip rungs above source resolution.
+      // 6. Effective ladder.
       const effectiveLadder = computeEffectiveLadder(config.ladder, probe.width, probe.height);
       logger.info("effective ladder", { rungs: effectiveLadder.map((r) => r.name) });
 
       // 7. Perceptual fingerprint.
       const fingerprint = await fingerprintVideo(localSource);
 
-      // 8. Perceptual match → quality compare → reuse or stage repoint.
+      // 8. Perceptual match.
       const match = await findPerceptualMatch(
-        destClient, config.dest.bucket, fingerprint, config.perceptualThreshold,
+        destClient, pair.dest.bucket, fingerprint, config.perceptualThreshold,
       );
       let pendingRepointFrom: string | null = null;
       if (match) {
@@ -224,20 +299,14 @@ async function processSource(args: {
           incomingHigherQuality: incomingHigher,
           dryRun: config.perceptualDryRun,
         });
-
         if (!config.perceptualDryRun) {
           if (!incomingHigher) {
-            // Reuse the existing transcoded output. Skip our own transcode.
             await writeMapping(
-              destClient, config.dest.bucket,
+              destClient, pair.dest.bucket,
               buildMapping(source, match.contentId),
             );
             return "deduped";
           }
-          // Incoming is higher quality. We'll re-transcode below as a new
-          // contentId, then repoint old mappings + GC after the new output is
-          // live. Staged so a transcode failure doesn't leave the system
-          // pointing at a half-deleted directory.
           pendingRepointFrom = match.contentId;
         }
       }
@@ -246,24 +315,21 @@ async function processSource(args: {
       const outputDir = path.join(tempDir, "hls");
       logger.info("transcoding", { sourceKey: source.key });
       await transcodeToHls({
-        input: localSource,
-        outputDir,
-        ladder: effectiveLadder,
-        hasAudio: probe.hasAudio,
+        input: localSource, outputDir, ladder: effectiveLadder, hasAudio: probe.hasAudio,
       });
 
       // 10. Upload HLS tree.
       logger.info("uploading HLS tree", { contentId });
       await uploadDirectory({
         client: destClient,
-        bucket: config.dest.bucket,
+        bucket: pair.dest.bucket,
         keyPrefix: byIdPrefix(contentId),
         localDir: outputDir,
       });
 
-      // 11. Upload fingerprint + index entry.
+      // 11. Fingerprint + index.
       await uploadFingerprint(
-        destClient, config.dest.bucket, contentId,
+        destClient, pair.dest.bucket, contentId,
         serializeFingerprint(fingerprint),
       );
       const indexEntry: FingerprintIndexEntry = {
@@ -275,7 +341,7 @@ async function processSource(args: {
         encodedAt: new Date().toISOString(),
       };
       if (probe.bitrateKbps !== undefined) indexEntry.videoBitrateKbps = probe.bitrateKbps;
-      await upsertIndexEntry(destClient, config.dest.bucket, indexEntry);
+      await upsertIndexEntry(destClient, pair.dest.bucket, indexEntry);
 
       // 12. Metadata + mapping.
       const metadata: OutputMetadata = {
@@ -290,18 +356,16 @@ async function processSource(args: {
         ladder: effectiveLadder,
       };
       if (probe.bitrateKbps !== undefined) metadata.source.bitrateKbps = probe.bitrateKbps;
-      await writeMetadata(destClient, config.dest.bucket, metadata);
-      await writeMapping(destClient, config.dest.bucket, buildMapping(source, contentId));
+      await writeMetadata(destClient, pair.dest.bucket, metadata);
+      await writeMapping(destClient, pair.dest.bucket, buildMapping(source, contentId));
 
       logger.info("transcode complete", { sourceKey: source.key, contentId });
 
-      // 13. Stage 2 of perceptual upgrade (if applicable): repoint old
-      // mappings to the new contentId, then GC the old output. Done after
-      // the new output is fully live so callers always see a valid playlist.
+      // 13. Repoint + GC if higher-quality replacement.
       if (pendingRepointFrom) {
         await repointAndGc({
           destClient,
-          bucket: config.dest.bucket,
+          bucket: pair.dest.bucket,
           oldContentId: pendingRepointFrom,
           newContentId: contentId,
           logger,
@@ -337,8 +401,6 @@ function computeEffectiveLadder(
 ): LadderRung[] {
   const filtered = full.filter((r) => r.width <= sourceWidth && r.height <= sourceHeight);
   if (filtered.length > 0) return filtered;
-  // Source is smaller than the smallest rung. Encode at the smallest rung
-  // anyway; ffmpeg's force_original_aspect_ratio=decrease + pad keeps it sane.
   return [full[0]!];
 }
 
@@ -346,7 +408,6 @@ function isHigherQuality(probe: ProbeResult, stored: FingerprintIndexEntry): boo
   const incomingPixels = probe.width * probe.height;
   const storedPixels = stored.width * stored.height;
   if (incomingPixels !== storedPixels) return incomingPixels > storedPixels;
-  // Equal resolution → break tie on bitrate when both are known.
   if (probe.bitrateKbps !== undefined && stored.videoBitrateKbps !== undefined) {
     return probe.bitrateKbps > stored.videoBitrateKbps;
   }
@@ -361,7 +422,6 @@ async function repointAndGc(args: {
   logger: Logger;
 }): Promise<void> {
   const { destClient, bucket, oldContentId, newContentId, logger } = args;
-
   const sourceKeys = await findMappingsForContentId(destClient, bucket, oldContentId);
   logger.info("repointing mappings to new transcoded output", {
     oldContentId, newContentId, mappingCount: sourceKeys.length,

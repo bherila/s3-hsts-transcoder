@@ -2,8 +2,8 @@
 export { VERSION } from "./version.js";
 
 // Config
-export type { Config, BucketConfig, LadderRung, Platform } from "./config.js";
-export { loadConfig, DEFAULT_LADDER } from "./config.js";
+export type { Config, BucketConfig, BucketPair, LadderRung, Platform } from "./config.js";
+export { loadConfig, DEFAULT_LADDER, bucketsOverlap } from "./config.js";
 
 // Logging
 export type { Logger, LogLevel } from "./logger.js";
