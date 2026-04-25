@@ -1,4 +1,26 @@
 export const VERSION = "0.1.0";
 
-// Public API will be added incrementally; see PLAN.md for planned modules:
-//   scanner, hasher, fingerprinter, transcoder, mapping I/O, lock, lease, ladder.
+// Config
+export type { Config, BucketConfig, LadderRung, Platform } from "./config.js";
+export { loadConfig, DEFAULT_LADDER } from "./config.js";
+
+// Logging
+export type { Logger, LogLevel } from "./logger.js";
+export { createLogger } from "./logger.js";
+
+// S3 client
+export { createS3Client, isPreconditionFailed, isNotFound } from "./s3.js";
+
+// Mapping I/O
+export type { SourceMapping } from "./mapping.js";
+export { readMapping, writeMapping, mappingKey, isCachedMapping } from "./mapping.js";
+
+// Lock + lease
+export type { LockBody, LockHandle, AcquireOptions } from "./lock.js";
+export {
+  acquireLock,
+  GLOBAL_LOCK_KEY,
+  computeLockTtlSeconds,
+  computeBudgetSeconds,
+} from "./lock.js";
+export { acquireLease, leaseKey } from "./lease.js";
