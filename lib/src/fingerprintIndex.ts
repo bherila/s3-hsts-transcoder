@@ -1,4 +1,9 @@
-import { GetObjectCommand, PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  type S3Client,
+} from "@aws-sdk/client-s3";
 import {
   deserializeFingerprint,
   fingerprintSimilarity,
@@ -71,6 +76,33 @@ export async function upsertIndexEntry(
   const filtered = index.entries.filter((e) => e.contentId !== entry.contentId);
   filtered.push(entry);
   await writeIndex(client, bucket, { version: 1, entries: filtered });
+}
+
+/** Removes an index entry by contentId. No-op if not present. */
+export async function removeIndexEntry(
+  client: S3Client,
+  bucket: string,
+  contentId: string,
+): Promise<void> {
+  const index = await readIndex(client, bucket);
+  const filtered = index.entries.filter((e) => e.contentId !== contentId);
+  if (filtered.length === index.entries.length) return;
+  await writeIndex(client, bucket, { version: 1, entries: filtered });
+}
+
+export async function deleteFingerprint(
+  client: S3Client,
+  bucket: string,
+  contentId: string,
+): Promise<void> {
+  try {
+    await client.send(
+      new DeleteObjectCommand({ Bucket: bucket, Key: fingerprintKey(contentId) }),
+    );
+  } catch (err) {
+    if (isNotFound(err)) return;
+    throw err;
+  }
 }
 
 export async function uploadFingerprint(

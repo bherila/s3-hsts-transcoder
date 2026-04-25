@@ -1,5 +1,10 @@
-import { HeadObjectCommand, type S3Client } from "@aws-sdk/client-s3";
-import { masterPlaylistKey } from "./contentId.js";
+import {
+  DeleteObjectsCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  type S3Client,
+} from "@aws-sdk/client-s3";
+import { byIdPrefix, masterPlaylistKey } from "./contentId.js";
 import { isNotFound } from "./s3.js";
 
 /**
@@ -20,4 +25,50 @@ export async function transcodedOutputExists(
     if (isNotFound(err)) return false;
     throw err;
   }
+}
+
+/**
+ * Removes everything under `by-id/<contentId>/`. Used when a higher-quality
+ * source supersedes existing transcoded output. Returns the number of
+ * objects deleted.
+ */
+export async function deleteByIdDirectory(
+  client: S3Client,
+  bucket: string,
+  contentId: string,
+): Promise<number> {
+  const prefix = byIdPrefix(contentId);
+  let deleted = 0;
+  let continuationToken: string | undefined;
+
+  do {
+    const res = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      }),
+    );
+
+    const objects = (res.Contents ?? []).filter((o) => o.Key);
+    if (objects.length > 0) {
+      // S3 DeleteObjects caps at 1000 keys per call.
+      for (let i = 0; i < objects.length; i += 1000) {
+        const batch = objects.slice(i, i + 1000);
+        await client.send(
+          new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: {
+              Objects: batch.map((o) => ({ Key: o.Key! })),
+            },
+          }),
+        );
+        deleted += batch.length;
+      }
+    }
+
+    continuationToken = res.NextContinuationToken;
+  } while (continuationToken);
+
+  return deleted;
 }

@@ -14,7 +14,13 @@ export { createS3Client, isPreconditionFailed, isNotFound } from "./s3.js";
 
 // Mapping I/O
 export type { SourceMapping } from "./mapping.js";
-export { readMapping, writeMapping, mappingKey, isCachedMapping } from "./mapping.js";
+export {
+  readMapping,
+  writeMapping,
+  mappingKey,
+  isCachedMapping,
+  findMappingsForContentId,
+} from "./mapping.js";
 
 // Lock + lease
 export type { LockBody, LockHandle, AcquireOptions } from "./lock.js";
@@ -44,8 +50,8 @@ export { scanSource, isVideoKey } from "./scanner.js";
 export type { HashedSource } from "./hasher.js";
 export { hashSource } from "./hasher.js";
 
-// Destination existence check
-export { transcodedOutputExists } from "./dest.js";
+// Destination existence check + cleanup
+export { transcodedOutputExists, deleteByIdDirectory } from "./dest.js";
 
 // Output metadata
 export type { OutputMetadata } from "./metadata.js";
@@ -90,8 +96,10 @@ export {
   readIndex,
   writeIndex,
   upsertIndexEntry,
+  removeIndexEntry,
   uploadFingerprint,
   readFingerprint,
+  deleteFingerprint,
   findPerceptualMatch,
   fingerprintKey,
 } from "./fingerprintIndex.js";

@@ -5,13 +5,16 @@ import path from "node:path";
 
 import type { Config, LadderRung } from "./config.js";
 import { byIdPrefix, formatContentId, masterPlaylistKey } from "./contentId.js";
-import { transcodedOutputExists } from "./dest.js";
+import { deleteByIdDirectory, transcodedOutputExists } from "./dest.js";
 import { downloadAndHash } from "./download.js";
+import type { ProbeResult } from "./ffmpeg/probe.js";
 import { probeSource } from "./ffmpeg/probe.js";
 import { transcodeToHls } from "./ffmpeg/transcode.js";
 import { fingerprintVideo, serializeFingerprint } from "./fingerprint.js";
 import {
+  deleteFingerprint,
   findPerceptualMatch,
+  removeIndexEntry,
   uploadFingerprint,
   upsertIndexEntry,
   type FingerprintIndexEntry,
@@ -19,7 +22,13 @@ import {
 import { acquireLease } from "./lease.js";
 import { acquireLock, computeBudgetSeconds, computeLockTtlSeconds } from "./lock.js";
 import type { Logger } from "./logger.js";
-import { isCachedMapping, readMapping, writeMapping, type SourceMapping } from "./mapping.js";
+import {
+  findMappingsForContentId,
+  isCachedMapping,
+  readMapping,
+  writeMapping,
+  type SourceMapping,
+} from "./mapping.js";
 import { writeMetadata, type OutputMetadata } from "./metadata.js";
 import { scanSource, type SourceObject, type ScanOptions } from "./scanner.js";
 import { uploadDirectory } from "./uploader.js";
@@ -197,20 +206,40 @@ async function processSource(args: {
       // 7. Perceptual fingerprint.
       const fingerprint = await fingerprintVideo(localSource);
 
-      // 8. Perceptual match check.
-      // v1 logs the match for observability. Quality-comparison + repoint of
-      // existing mappings (when incoming is higher resolution) lands in a
-      // follow-up commit. Until then, every miss-on-byte-hash transcodes.
+      // 8. Perceptual match → quality compare → reuse or stage repoint.
       const match = await findPerceptualMatch(
         destClient, config.dest.bucket, fingerprint, config.perceptualThreshold,
       );
+      let pendingRepointFrom: string | null = null;
       if (match) {
-        logger.info("perceptual match (informational; no action in v1)", {
+        const incomingHigher = isHigherQuality(probe, match.entry);
+        logger.info("perceptual match", {
           sourceKey: source.key,
           matchedContentId: match.contentId,
           similarity: Number(match.similarity.toFixed(3)),
+          stored: { width: match.entry.width, height: match.entry.height,
+                    videoBitrateKbps: match.entry.videoBitrateKbps },
+          incoming: { width: probe.width, height: probe.height,
+                      bitrateKbps: probe.bitrateKbps },
+          incomingHigherQuality: incomingHigher,
           dryRun: config.perceptualDryRun,
         });
+
+        if (!config.perceptualDryRun) {
+          if (!incomingHigher) {
+            // Reuse the existing transcoded output. Skip our own transcode.
+            await writeMapping(
+              destClient, config.dest.bucket,
+              buildMapping(source, match.contentId),
+            );
+            return "deduped";
+          }
+          // Incoming is higher quality. We'll re-transcode below as a new
+          // contentId, then repoint old mappings + GC after the new output is
+          // live. Staged so a transcode failure doesn't leave the system
+          // pointing at a half-deleted directory.
+          pendingRepointFrom = match.contentId;
+        }
       }
 
       // 9. Transcode.
@@ -265,6 +294,20 @@ async function processSource(args: {
       await writeMapping(destClient, config.dest.bucket, buildMapping(source, contentId));
 
       logger.info("transcode complete", { sourceKey: source.key, contentId });
+
+      // 13. Stage 2 of perceptual upgrade (if applicable): repoint old
+      // mappings to the new contentId, then GC the old output. Done after
+      // the new output is fully live so callers always see a valid playlist.
+      if (pendingRepointFrom) {
+        await repointAndGc({
+          destClient,
+          bucket: config.dest.bucket,
+          oldContentId: pendingRepointFrom,
+          newContentId: contentId,
+          logger,
+        });
+      }
+
       return "transcoded";
     } finally {
       await lease.release();
@@ -297,4 +340,50 @@ function computeEffectiveLadder(
   // Source is smaller than the smallest rung. Encode at the smallest rung
   // anyway; ffmpeg's force_original_aspect_ratio=decrease + pad keeps it sane.
   return [full[0]!];
+}
+
+function isHigherQuality(probe: ProbeResult, stored: FingerprintIndexEntry): boolean {
+  const incomingPixels = probe.width * probe.height;
+  const storedPixels = stored.width * stored.height;
+  if (incomingPixels !== storedPixels) return incomingPixels > storedPixels;
+  // Equal resolution → break tie on bitrate when both are known.
+  if (probe.bitrateKbps !== undefined && stored.videoBitrateKbps !== undefined) {
+    return probe.bitrateKbps > stored.videoBitrateKbps;
+  }
+  return false;
+}
+
+async function repointAndGc(args: {
+  destClient: S3Client;
+  bucket: string;
+  oldContentId: string;
+  newContentId: string;
+  logger: Logger;
+}): Promise<void> {
+  const { destClient, bucket, oldContentId, newContentId, logger } = args;
+
+  const sourceKeys = await findMappingsForContentId(destClient, bucket, oldContentId);
+  logger.info("repointing mappings to new transcoded output", {
+    oldContentId, newContentId, mappingCount: sourceKeys.length,
+  });
+
+  for (const sourceKey of sourceKeys) {
+    const old = await readMapping(destClient, bucket, sourceKey);
+    if (!old) continue;
+    const updated: SourceMapping = {
+      ...old,
+      contentId: newContentId,
+      hlsRoot: masterPlaylistKey(newContentId),
+      encoderVersion: VERSION,
+    };
+    await writeMapping(destClient, bucket, updated);
+  }
+
+  logger.info("garbage-collecting superseded transcoded output", { oldContentId });
+  const deletedCount = await deleteByIdDirectory(destClient, bucket, oldContentId);
+  await deleteFingerprint(destClient, bucket, oldContentId);
+  await removeIndexEntry(destClient, bucket, oldContentId);
+  logger.info("perceptual upgrade complete", {
+    oldContentId, newContentId, deletedObjects: deletedCount,
+  });
 }

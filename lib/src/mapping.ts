@@ -1,5 +1,13 @@
-import { GetObjectCommand, PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  type S3Client,
+} from "@aws-sdk/client-s3";
 import { isNotFound } from "./s3.js";
+
+const MAPPING_PREFIX = "mappings/";
+const MAPPING_SUFFIX = ".json";
 
 export interface SourceMapping {
   sourceKey: string;
@@ -13,7 +21,12 @@ export interface SourceMapping {
 }
 
 export function mappingKey(sourceKey: string): string {
-  return `mappings/${sourceKey}.json`;
+  return `${MAPPING_PREFIX}${sourceKey}${MAPPING_SUFFIX}`;
+}
+
+function sourceKeyFromMappingKey(key: string): string | null {
+  if (!key.startsWith(MAPPING_PREFIX) || !key.endsWith(MAPPING_SUFFIX)) return null;
+  return key.slice(MAPPING_PREFIX.length, key.length - MAPPING_SUFFIX.length);
 }
 
 export async function readMapping(
@@ -61,4 +74,46 @@ export function isCachedMapping(
 ): boolean {
   if (!mapping) return false;
   return mapping.sourceEtag === current.etag && mapping.sourceSize === current.size;
+}
+
+/**
+ * Returns source keys whose mapping currently points at `contentId`. Used
+ * before a perceptual repoint so we know which mappings to update when we
+ * replace stored output with a higher-quality version.
+ *
+ * O(N) GETs over the mappings/ prefix. Acceptable while mapping count is
+ * modest; a reverse-index file under by-id/<id>/refs.json would be the
+ * natural optimization later.
+ */
+export async function findMappingsForContentId(
+  client: S3Client,
+  bucket: string,
+  contentId: string,
+): Promise<string[]> {
+  const result: string[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const res = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: MAPPING_PREFIX,
+        ContinuationToken: continuationToken,
+      }),
+    );
+
+    for (const obj of res.Contents ?? []) {
+      if (!obj.Key) continue;
+      const sourceKey = sourceKeyFromMappingKey(obj.Key);
+      if (!sourceKey) continue;
+      const mapping = await readMapping(client, bucket, sourceKey);
+      if (mapping?.contentId === contentId) {
+        result.push(sourceKey);
+      }
+    }
+
+    continuationToken = res.NextContinuationToken;
+  } while (continuationToken);
+
+  return result;
 }
