@@ -1,21 +1,34 @@
 # cloudflare — Cloudflare Containers entrypoint
 
-Containerized Node entrypoint deployed via Cloudflare Containers. Triggered by a Worker Cron Trigger that wakes the container's Durable Object.
+Containerized Node entrypoint deployed via Cloudflare Containers. The container runs a one-shot transcoding pass and exits.
 
 See **[../PLAN.md](../PLAN.md)** for architecture and **[../CLAUDE.md](../CLAUDE.md)** for conventions.
 
 ## Configuration
 
-Set env vars in `wrangler.jsonc` `vars` (non-secret) or via `wrangler secret put` (secrets). Variable names are listed in [`local/.env.sample`](../local/.env.sample). On this entrypoint, `MAX_RUNTIME_SECONDS` defaults to **3600**.
+Env vars are documented in [`local/.env.sample`](../local/.env.sample). Set them in `wrangler.jsonc` `vars` (non-secrets) or via `wrangler secret put` (secrets like `*_SECRET_ACCESS_KEY`). On this entrypoint, `MAX_RUNTIME_SECONDS` defaults to **3600**.
+
+## Build
+
+From the repo root:
+
+```sh
+docker build -f cloudflare/Dockerfile -t s3-hsts-transcoder-cf .
+```
+
+## Deploy
+
+1. Copy [`wrangler.jsonc.example`](./wrangler.jsonc.example) to `wrangler.jsonc` and fill in details.
+2. Push the container image to a registry that Cloudflare can pull from (or rely on `wrangler` to build + push for you, depending on current CF Containers tooling).
+3. Implement `src/worker.ts` — a Durable Object that owns the container plus a `scheduled` cron handler that triggers it. **This shim is not yet in the repo**; see `wrangler.jsonc.example` for the contract.
+4. `pnpm wrangler deploy`.
+
+> **Heads up:** the Containers + Durable Objects + Worker wiring is still evolving. Verify the binding syntax and DO/Container interaction against [developers.cloudflare.com/containers/](https://developers.cloudflare.com/containers/) before deploying.
 
 ## Container lifecycle
 
-The cron Worker wakes the container's Durable Object, which starts the container. The container runs the transcoding pass, releases the global lock, and exits. CF tears down the container after `sleepAfter` (configured in `wrangler.jsonc`).
+The Worker (cron-triggered) wakes the container's Durable Object, which starts the container. The container's entrypoint (`node dist/index.js`) runs `runOnce()`, releases the global lock, and exits. Cloudflare tears down the container after `sleepAfter` (configured in `wrangler.jsonc`).
 
 ## R2 bindings vs. S3 API
 
-R2 bindings are faster and bypass the public network. v1 uses the S3-compatible API for portability; switching to bindings is a future optimization.
-
-## Build & deploy
-
-`Dockerfile` and `wrangler.jsonc` are forthcoming — populated alongside the real `lib` implementation.
+R2 bindings are faster and avoid the public network. v1 uses the S3-compatible API for portability across all three platforms; switching to native R2 bindings on this entrypoint is a future optimization.

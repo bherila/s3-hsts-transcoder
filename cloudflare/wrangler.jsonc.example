@@ -1,0 +1,58 @@
+// Skeleton wrangler.jsonc for deploying to Cloudflare Containers.
+//
+// IMPORTANT: Cloudflare Containers config is moving. Verify the exact field
+// names and structure against current docs before deploying:
+//   https://developers.cloudflare.com/containers/
+//
+// To use:
+//   1. Copy this file to `wrangler.jsonc`.
+//   2. Fill in your account_id, container image registry, and any vars/secrets.
+//   3. Build + push the container image (see Dockerfile in this folder).
+//   4. `pnpm wrangler deploy` from this folder.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "s3-hsts-transcoder",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-04-01",
+
+  // Run the worker every 15 minutes.
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+
+  // Durable Object that owns the container instance lifecycle.
+  "durable_objects": {
+    "bindings": [
+      { "name": "TRANSCODER_DO", "class_name": "TranscoderContainer" }
+    ]
+  },
+
+  "containers": [
+    {
+      "class_name": "TranscoderContainer",
+      "image": "./Dockerfile",
+      "instance_type": "standard",
+      "max_instances": 1
+    }
+  ],
+
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["TranscoderContainer"] }
+  ],
+
+  // Non-secret env vars. Use `wrangler secret put` for credentials.
+  "vars": {
+    // "LOG_LEVEL": "info",
+    // "MAX_RUNTIME_SECONDS": "3600"
+  }
+
+  // The worker shim (src/worker.ts) is not yet committed. It needs to:
+  //   1. Implement TranscoderContainer (a DurableObject subclass) that owns
+  //      the container instance and forwards a "run" request to it.
+  //   2. Export a default `scheduled(event, env, ctx)` cron handler that
+  //      acquires the DO singleton via env.TRANSCODER_DO.idFromName("singleton")
+  //      and triggers a transcoding pass.
+  //
+  // See developers.cloudflare.com/containers/get-started/ for the current
+  // template; the binding shape between DO and Container has been evolving.
+}
