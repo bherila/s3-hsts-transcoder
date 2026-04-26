@@ -1,6 +1,6 @@
 # TESTING.md
 
-Testing guide for `s3-hsts-transcoder`. See [CLAUDE.md](./CLAUDE.md) for project conventions, [SPEC.md](./SPEC.md) for the behavioral contract being tested.
+Testing guide for `s3-hls-transcoder`. See [CLAUDE.md](./CLAUDE.md) for project conventions, [SPEC.md](./SPEC.md) for the behavioral contract being tested.
 
 ## Running tests
 
@@ -64,7 +64,7 @@ Not yet implemented. A GitHub issue template exists for the MinIO integration te
 
 The CI job (`ci.yml`) runs:
 
-1. `pnpm --filter @s3-hsts-transcoder/lib build` — builds `lib/dist` so downstream `tsc --noEmit` can resolve types
+1. `pnpm --filter @s3-hls-transcoder/lib build` — builds `lib/dist` so downstream `tsc --noEmit` can resolve types
 2. `pnpm typecheck` — all packages
 3. `pnpm build` — all packages
 4. `pnpm test` — all packages

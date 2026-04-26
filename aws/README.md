@@ -25,7 +25,7 @@ Set the env vars listed in [`local/.env.sample`](../local/.env.sample) on the La
 From the repo root:
 
 ```sh
-docker build -f aws/Dockerfile -t s3-hsts-transcoder-aws .
+docker build -f aws/Dockerfile -t s3-hls-transcoder-aws .
 ```
 
 ## Push to ECR
@@ -34,7 +34,7 @@ docker build -f aws/Dockerfile -t s3-hsts-transcoder-aws .
 # 1. Set common shell vars.
 export AWS_REGION=us-east-1
 export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-export ECR_REPO=s3-hsts-transcoder-aws
+export ECR_REPO=s3-hls-transcoder-aws
 export IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
 
 # 2. Create the ECR repo (one-time).
@@ -57,7 +57,7 @@ docker buildx build -f aws/Dockerfile \
 ```sh
 # 1. Create the IAM role for the function. Trust policy + the policy below
 #    (substitute SOURCE_BUCKET / DEST_BUCKET).
-aws iam create-role --role-name s3-hsts-transcoder \
+aws iam create-role --role-name s3-hls-transcoder \
   --assume-role-policy-document '{
     "Version": "2012-10-17",
     "Statement": [{
@@ -66,42 +66,42 @@ aws iam create-role --role-name s3-hsts-transcoder \
       "Action": "sts:AssumeRole"
     }]
   }'
-aws iam put-role-policy --role-name s3-hsts-transcoder \
-  --policy-name s3-hsts-transcoder-policy \
+aws iam put-role-policy --role-name s3-hls-transcoder \
+  --policy-name s3-hls-transcoder-policy \
   --policy-document file://aws/iam-policy.json   # see Sample IAM policy below
 
 # 2. Create the Lambda function from the container image.
 aws lambda create-function \
-  --function-name s3-hsts-transcoder \
+  --function-name s3-hls-transcoder \
   --package-type Image \
   --code ImageUri=$IMAGE_URI \
   --architectures arm64 \
   --memory-size 10240 \
   --timeout 900 \
-  --role arn:aws:iam::$ACCOUNT_ID:role/s3-hsts-transcoder \
+  --role arn:aws:iam::$ACCOUNT_ID:role/s3-hls-transcoder \
   --environment "Variables={SOURCE_BUCKET=...,SOURCE_ENDPOINT=...,...}"
 
 # 3. Create the EventBridge cron rule.
 aws events put-rule \
-  --name s3-hsts-transcoder-cron \
+  --name s3-hls-transcoder-cron \
   --schedule-expression 'cron(0/15 * * * ? *)'
 
 # 4. Allow EventBridge to invoke the function. (Without this, the rule fires
 #    but the invoke is denied — easy to miss.)
 aws lambda add-permission \
-  --function-name s3-hsts-transcoder \
+  --function-name s3-hls-transcoder \
   --statement-id eventbridge-invoke \
   --action lambda:InvokeFunction \
   --principal events.amazonaws.com \
-  --source-arn arn:aws:events:$AWS_REGION:$ACCOUNT_ID:rule/s3-hsts-transcoder-cron
+  --source-arn arn:aws:events:$AWS_REGION:$ACCOUNT_ID:rule/s3-hls-transcoder-cron
 
 # 5. Wire the rule to the function.
 aws events put-targets \
-  --rule s3-hsts-transcoder-cron \
-  --targets "Id=1,Arn=arn:aws:lambda:$AWS_REGION:$ACCOUNT_ID:function:s3-hsts-transcoder"
+  --rule s3-hls-transcoder-cron \
+  --targets "Id=1,Arn=arn:aws:lambda:$AWS_REGION:$ACCOUNT_ID:function:s3-hls-transcoder"
 ```
 
-To **update** after a code change: rebuild + push the image, then `aws lambda update-function-code --function-name s3-hsts-transcoder --image-uri $IMAGE_URI`.
+To **update** after a code change: rebuild + push the image, then `aws lambda update-function-code --function-name s3-hls-transcoder --image-uri $IMAGE_URI`.
 
 ## Local test (optional)
 
@@ -110,7 +110,7 @@ The Lambda Runtime Interface Emulator runs the image locally:
 ```sh
 docker run --rm -p 9000:8080 \
     --env-file ../local/.env \
-    s3-hsts-transcoder-aws
+    s3-hls-transcoder-aws
 
 # In another shell:
 curl -X POST 'http://localhost:9000/2015-03-31/functions/function/invocations' -d '{}'

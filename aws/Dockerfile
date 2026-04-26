@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 #
-# AWS Lambda container image for the @s3-hsts-transcoder/aws entrypoint.
+# AWS Lambda container image for the @s3-hls-transcoder/aws entrypoint.
 #
 # Build from the repo root:
-#   docker build -f aws/Dockerfile -t s3-hsts-transcoder-aws .
+#   docker build -f aws/Dockerfile -t s3-hls-transcoder-aws .
 #
 # Multi-arch (linux/amd64 + linux/arm64 Graviton):
 #   docker buildx build -f aws/Dockerfile --platform linux/amd64,linux/arm64 \
-#       -t <ecr-registry>/s3-hsts-transcoder-aws:latest --push .
+#       -t <ecr-registry>/s3-hls-transcoder-aws:latest --push .
 #
 # Lambda config: timeout 900s, memory 3008–10240 MB. Handler is the default
 # from CMD: `dist/index.handler`.
@@ -26,8 +26,8 @@ COPY lib ./lib
 COPY aws ./aws
 
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @s3-hsts-transcoder/lib --filter @s3-hsts-transcoder/aws -r build
-RUN pnpm --filter @s3-hsts-transcoder/aws deploy --prod /deploy
+RUN pnpm --filter @s3-hls-transcoder/lib --filter @s3-hls-transcoder/aws -r build
+RUN pnpm --filter @s3-hls-transcoder/aws deploy --prod /deploy
 
 # ----- Runtime stage ------------------------------------------------------
 FROM public.ecr.aws/lambda/nodejs:${NODE_VERSION}

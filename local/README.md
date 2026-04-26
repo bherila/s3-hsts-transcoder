@@ -43,7 +43,7 @@ Notes:
 ```ini
 # /etc/systemd/system/transcoder.service
 [Unit]
-Description=s3-hsts-transcoder
+Description=s3-hls-transcoder
 
 [Service]
 Type=oneshot
@@ -55,7 +55,7 @@ EnvironmentFile=/opt/transcoder/local/.env
 ```ini
 # /etc/systemd/system/transcoder.timer
 [Unit]
-Description=Run s3-hsts-transcoder every 15 minutes
+Description=Run s3-hls-transcoder every 15 minutes
 
 [Timer]
 OnCalendar=*:0/15

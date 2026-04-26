@@ -16,8 +16,8 @@ See **[../PLAN.md](../PLAN.md)** for architecture and **[../CLAUDE.md](../CLAUDE
 ## Install wrangler
 
 ```sh
-pnpm --filter @s3-hsts-transcoder/cloudflare add -D wrangler
-pnpm --filter @s3-hsts-transcoder/cloudflare exec wrangler login
+pnpm --filter @s3-hls-transcoder/cloudflare add -D wrangler
+pnpm --filter @s3-hls-transcoder/cloudflare exec wrangler login
 ```
 
 ## Configuration
@@ -41,8 +41,8 @@ pnpm exec wrangler secret put DEST_SECRET_ACCESS_KEY
 ## Build (optional, for local testing)
 
 ```sh
-docker build -f cloudflare/Dockerfile -t s3-hsts-transcoder-cf .
-docker run --rm --env-file local/.env s3-hsts-transcoder-cf   # smoke test
+docker build -f cloudflare/Dockerfile -t s3-hls-transcoder-cf .
+docker run --rm --env-file local/.env s3-hls-transcoder-cf   # smoke test
 ```
 
 ## Deploy

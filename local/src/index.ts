@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { createLogger, loadConfig, runOnce, VERSION } from "@s3-hsts-transcoder/lib";
+import { createLogger, loadConfig, runOnce, VERSION } from "@s3-hls-transcoder/lib";
 
 async function main(): Promise<void> {
   const config = loadConfig("local");

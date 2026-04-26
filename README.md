@@ -1,4 +1,4 @@
-# s3-hsts-transcoder
+# s3-hls-transcoder
 
 Self-hosted video transcoder. Watches an S3-compatible source bucket and produces HLS streaming output in a destination bucket. Designed to run on **AWS Lambda**, **Cloudflare Containers**, or any **local / VPS / AWS Lightsail** host on a cron schedule. No per-minute pricing.
 
@@ -23,8 +23,8 @@ Each package has its own README with platform-specific setup. Configuration is v
 ## First-time setup
 
 ```sh
-git clone <repo> s3-hsts-transcoder
-cd s3-hsts-transcoder
+git clone <repo> s3-hls-transcoder
+cd s3-hls-transcoder
 pnpm install
 pnpm build
 pnpm test          # 53 unit tests
@@ -37,7 +37,7 @@ The fastest path from zero to a playable HLS manifest:
 ```sh
 cp local/.env.sample local/.env
 # edit local/.env: fill SOURCE_* and DEST_* (bucket, endpoint, keys)
-pnpm --filter @s3-hsts-transcoder/local dev
+pnpm --filter @s3-hls-transcoder/local dev
 ```
 
 This runs one transcoding pass against the buckets in `.env` and exits. After it finishes, find your output at:

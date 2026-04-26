@@ -29,7 +29,7 @@ importers:
 
   aws:
     dependencies:
-      '@s3-hsts-transcoder/lib':
+      '@s3-hls-transcoder/lib':
         specifier: workspace:*
         version: link:../lib
     devDependencies:
@@ -48,7 +48,7 @@ importers:
 
   cloudflare:
     dependencies:
-      '@s3-hsts-transcoder/lib':
+      '@s3-hls-transcoder/lib':
         specifier: workspace:*
         version: link:../lib
     devDependencies:
@@ -73,7 +73,7 @@ importers:
 
   integration:
     dependencies:
-      '@s3-hsts-transcoder/lib':
+      '@s3-hls-transcoder/lib':
         specifier: workspace:*
         version: link:../lib
     devDependencies:
@@ -120,7 +120,7 @@ importers:
 
   local:
     dependencies:
-      '@s3-hsts-transcoder/lib':
+      '@s3-hls-transcoder/lib':
         specifier: workspace:*
         version: link:../lib
       dotenv:

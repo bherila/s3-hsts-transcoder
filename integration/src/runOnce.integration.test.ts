@@ -7,7 +7,7 @@
  *   - ffmpeg on PATH (or FFMPEG_PATH set)
  *
  * Run with:
- *   INTEGRATION=1 pnpm --filter @s3-hsts-transcoder/integration test
+ *   INTEGRATION=1 pnpm --filter @s3-hls-transcoder/integration test
  */
 
 import {
@@ -23,8 +23,8 @@ import path from "node:path";
 import { GenericContainer, Wait } from "testcontainers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { Config } from "@s3-hsts-transcoder/lib";
-import { GLOBAL_LOCK_KEY, mappingKey, masterPlaylistKey, runOnce } from "@s3-hsts-transcoder/lib";
+import type { Config } from "@s3-hls-transcoder/lib";
+import { GLOBAL_LOCK_KEY, mappingKey, masterPlaylistKey, runOnce } from "@s3-hls-transcoder/lib";
 
 // ---------------------------------------------------------------------------
 // Guard: skip the whole suite when INTEGRATION=1 is absent.

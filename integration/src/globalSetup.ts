@@ -26,7 +26,7 @@ export async function setup(): Promise<void> {
     // Skip loudly rather than silently so CI misconfiguration is obvious.
     console.log(
       "\n[integration] INTEGRATION env var is not set to 1 — skipping all integration tests.\n" +
-        "  Run with: INTEGRATION=1 pnpm --filter @s3-hsts-transcoder/integration test\n",
+        "  Run with: INTEGRATION=1 pnpm --filter @s3-hls-transcoder/integration test\n",
     );
     // Returning early means no test files are set up; Vitest will find zero
     // test files from globalSetup's perspective, but the suite files will

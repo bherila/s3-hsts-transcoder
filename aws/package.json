@@ -1,5 +1,5 @@
 {
-  "name": "@s3-hsts-transcoder/aws",
+  "name": "@s3-hls-transcoder/aws",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@s3-hsts-transcoder/lib": "workspace:*"
+    "@s3-hls-transcoder/lib": "workspace:*"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.0",

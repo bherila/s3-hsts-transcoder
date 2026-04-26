@@ -22,7 +22,7 @@ Entrypoints depend on `lib` via `workspace:*` and call into it; they only contai
 
 ## Naming
 
-The repo is named `s3-hsts-transcoder`. The format is **HLS** (HTTP Live Streaming). Don't introduce more "HSTS" naming in code or docs — fix any you find.
+The repo is named `s3-hls-transcoder`. The format is **HLS** (HTTP Live Streaming). Don't introduce more "HSTS" naming in code or docs — fix any you find.
 
 ## Bucket conventions
 

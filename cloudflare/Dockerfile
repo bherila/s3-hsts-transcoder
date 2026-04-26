@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 #
-# Cloudflare Containers image for the @s3-hsts-transcoder/cloudflare entrypoint.
+# Cloudflare Containers image for the @s3-hls-transcoder/cloudflare entrypoint.
 #
 # Build from the repo root:
-#   docker build -f cloudflare/Dockerfile -t s3-hsts-transcoder-cf .
+#   docker build -f cloudflare/Dockerfile -t s3-hls-transcoder-cf .
 #
 # Multi-arch:
 #   docker buildx build -f cloudflare/Dockerfile --platform linux/amd64,linux/arm64 \
-#       -t <registry>/s3-hsts-transcoder-cf:latest --push .
+#       -t <registry>/s3-hls-transcoder-cf:latest --push .
 
 ARG NODE_VERSION=22
 
@@ -23,8 +23,8 @@ COPY lib ./lib
 COPY cloudflare ./cloudflare
 
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @s3-hsts-transcoder/lib --filter @s3-hsts-transcoder/cloudflare -r build
-RUN pnpm --filter @s3-hsts-transcoder/cloudflare deploy --prod /deploy
+RUN pnpm --filter @s3-hls-transcoder/lib --filter @s3-hls-transcoder/cloudflare -r build
+RUN pnpm --filter @s3-hls-transcoder/cloudflare deploy --prod /deploy
 
 # ----- Runtime stage ------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm-slim

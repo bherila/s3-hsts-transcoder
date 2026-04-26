@@ -4,7 +4,7 @@
 
 Self-hosted video transcoder. Scans an S3-compatible source bucket on a cron schedule and produces HLS streaming output in a destination bucket. Runs on AWS Lambda, Cloudflare Containers, or any local/VPS host (AWS Lightsail recommended). Avoids per-minute pricing of hosted services like Cloudflare Stream or AWS MediaConvert.
 
-> The repo directory is named `s3-hsts-transcoder`. The output format is **HLS** (HTTP Live Streaming) — the "HSTS" in the directory name is a leftover from initial scoping; HSTS is unrelated to streaming.
+> The repo directory is named `s3-hls-transcoder`. The output format is **HLS** (HTTP Live Streaming) — the "HSTS" in the directory name is a leftover from initial scoping; HSTS is unrelated to streaming.
 
 ## Architecture
 

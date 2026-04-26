@@ -1,4 +1,4 @@
-import { createLogger, loadConfig, runOnce, VERSION } from "@s3-hsts-transcoder/lib";
+import { createLogger, loadConfig, runOnce, VERSION } from "@s3-hls-transcoder/lib";
 
 export const handler = async (): Promise<{ statusCode: number; body: string }> => {
   const config = loadConfig("aws-lambda");

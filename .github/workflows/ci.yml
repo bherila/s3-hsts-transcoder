@@ -26,7 +26,7 @@ jobs:
 
       - run: pnpm format:check
 
-      - run: pnpm --filter @s3-hsts-transcoder/lib build
+      - run: pnpm --filter @s3-hls-transcoder/lib build
 
       - run: pnpm typecheck
 
