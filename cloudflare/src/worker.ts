@@ -1,43 +1,30 @@
-// @ts-nocheck
-//
-// Cloudflare Workers shim that fronts the container in `./index.ts`.
-//
-// THIS IS A SKELETON. The Cloudflare Containers + Durable Objects + Worker
-// binding surface has been evolving; verify against current docs before
-// deploying:
-//   https://developers.cloudflare.com/containers/
-//
-// Excluded from the package's main `tsc` build (see ../tsconfig.json) — the
-// container build only needs `index.ts`. This file runs in the V8 isolate
-// (no Node APIs); install `@cloudflare/workers-types` and remove the
-// `@ts-nocheck` once you're ready to type-check it locally.
-//
-// Roles:
-//   - default export: cron handler. Wakes the DO singleton on each tick.
-//   - TranscoderContainer (DurableObject): owns a single Container instance
-//     and routes `/run` requests into it. The Container's HTTP server (or
-//     just `node dist/index.js` running runOnce) is what does the work.
+/**
+ * Cloudflare Worker cron handler — runs in the V8 isolate (not in the container).
+ *
+ * Responsibilities:
+ *   1. Receive the cron tick via the scheduled handler.
+ *   2. Wake the TranscoderContainer Durable Object singleton.
+ *   3. The DO starts the container if it is not already running; the container
+ *      runs `node dist/index.js` (which calls runOnce() and exits naturally).
+ *
+ * Excluded from the main tsc build (see tsconfig.json) — the container build
+ * only needs index.ts. Type-checked separately via tsconfig.worker.json.
+ *
+ * Deploy: `wrangler deploy` from this directory (see wrangler.toml).
+ * Docs:   https://developers.cloudflare.com/containers/
+ */
 
-export class TranscoderContainer {
-  state: DurableObjectState;
-  env: Env;
-  container: Container;
+import { Container } from "@cloudflare/containers";
 
-  constructor(state: DurableObjectState, env: Env) {
-    this.state = state;
-    this.env = env;
-    // Binding name `this.ctx.container` / `state.container` has shifted
-    // between Containers preview revisions — confirm in current docs.
-    this.container = state.container as Container;
-  }
+export class TranscoderContainer extends Container<Env> {
+  // Keep the DO (and the container) alive for up to 10 minutes of inactivity.
+  // After that, onActivityExpired() (from the base class) calls stop().
+  override sleepAfter = "10m";
 
-  async fetch(req: Request): Promise<Response> {
-    if (!this.container.running) {
-      this.container.start();
-    }
-    // Forward the request into the container so its entrypoint can handle
-    // it, OR just return immediately and rely on the container's CMD to run
-    // `runOnce()` and exit. The latter is what `Dockerfile` is set up for.
+  // Our container runs a one-shot CLI (runOnce) — there is no HTTP server
+  // to proxy to. We just need to wake it; the container transcodes and exits.
+  override async fetch(_request: Request): Promise<Response> {
+    await this.start();
     return new Response("started", { status: 202 });
   }
 }
@@ -46,10 +33,11 @@ export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const id = env.TRANSCODER_DO.idFromName("singleton");
     const stub = env.TRANSCODER_DO.get(id);
-    ctx.waitUntil(stub.fetch("https://do/run"));
+    // waitUntil keeps the isolate alive while the DO fetch settles.
+    ctx.waitUntil(stub.fetch(new Request("https://do/run")));
   },
 };
 
 interface Env {
-  TRANSCODER_DO: DurableObjectNamespace;
+  TRANSCODER_DO: DurableObjectNamespace<TranscoderContainer>;
 }

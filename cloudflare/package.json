@@ -9,13 +9,15 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.worker.json",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@s3-hsts-transcoder/lib": "workspace:*"
   },
   "devDependencies": {
+    "@cloudflare/containers": "^0.3.3",
+    "@cloudflare/workers-types": "^4.20260426.1",
     "@types/node": "^22.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.5.0",

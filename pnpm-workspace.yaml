@@ -3,3 +3,4 @@ packages:
   - aws
   - cloudflare
   - local
+  - integration

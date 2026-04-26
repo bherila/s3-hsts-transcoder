@@ -1,0 +1,40 @@
+name = "s3-hls-transcoder"
+main = "src/worker.ts"
+compatibility_date = "2024-09-23"
+
+# Cloudflare Containers binding — links the DO class to the container image.
+# The image is built from ./Dockerfile (relative to this directory).
+# Docs: https://developers.cloudflare.com/containers/
+[[containers]]
+class_name = "TranscoderContainer"
+image = "./Dockerfile"
+# instance_type controls CPU/memory. Encoding is CPU-bound; use at least standard-2.
+# Options: lite, basic, standard-1, standard-2, standard-3, standard-4
+instance_type = "standard-2"
+# Maximum simultaneous container instances. The global lock in lib enforces
+# single-runner semantics, so more than one is fine — they'll queue behind the lock.
+max_instances = 2
+
+# Durable Object binding — wires env.TRANSCODER_DO to the TranscoderContainer class.
+[[durable_objects.bindings]]
+name = "TRANSCODER_DO"
+class_name = "TranscoderContainer"
+
+# Required migration to register the DO class with Cloudflare.
+# Bump the tag and add new_classes / deleted_classes if you rename or remove a class.
+[[migrations]]
+tag = "v1"
+new_classes = ["TranscoderContainer"]
+
+# Cron trigger — fires the `scheduled` handler. Matches the 15-minute default
+# used by the other entrypoints. Adjust to taste.
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Environment variables. Credentials should be set as secrets via:
+#   wrangler secret put SOURCE_ACCESS_KEY_ID
+#   wrangler secret put SOURCE_SECRET_ACCESS_KEY
+#   ... etc.
+# See local/.env.sample for the full variable reference.
+[vars]
+LOG_LEVEL = "info"
