@@ -13,9 +13,9 @@ All tests live in `lib/src/`. The entrypoint packages (`aws`, `cloudflare`, `loc
 
 ## Test file naming
 
-| Pattern | Description |
-|---|---|
-| `*.test.ts` | Pure unit tests — no S3 or ffmpeg required |
+| Pattern            | Description                                                     |
+| ------------------ | --------------------------------------------------------------- |
+| `*.test.ts`        | Pure unit tests — no S3 or ffmpeg required                      |
 | `*.s3mock.test.ts` | Unit tests that exercise S3 I/O paths via `aws-sdk-client-mock` |
 
 Separate the suffix so `vitest` can run both by default and so it's obvious at a glance whether a test file touches S3 API paths.
@@ -32,22 +32,23 @@ S3 error stubs use `S3ServiceException` directly — construct them with `name`,
 
 ## What is and isn't covered
 
-| Area | Covered | Notes |
-|---|---|---|
-| Lock acquire / stale takeover / release | Yes | `lock.s3mock.test.ts` |
-| Mapping read / write / dedup check | Yes | `mapping.s3mock.test.ts` |
-| Content ID (SHA-256 scheme prefix) | Yes | `contentId.test.ts` |
-| Fingerprint math + serialization | Yes | `fingerprint.test.ts` |
-| Config parsing + overlap validation | Yes | `config.test.ts` |
-| Scanner (S3 list) | Yes | `scanner.test.ts` |
-| Uploader | Yes | `uploader.test.ts` |
-| ffmpeg transcode / probe / signature | **No** | Requires real binary |
-| Full orchestrator pipeline | **No** | Integration test — see below |
-| Real S3 / R2 / MinIO round-trip | **No** | Integration test — see below |
+| Area                                    | Covered | Notes                        |
+| --------------------------------------- | ------- | ---------------------------- |
+| Lock acquire / stale takeover / release | Yes     | `lock.s3mock.test.ts`        |
+| Mapping read / write / dedup check      | Yes     | `mapping.s3mock.test.ts`     |
+| Content ID (SHA-256 scheme prefix)      | Yes     | `contentId.test.ts`          |
+| Fingerprint math + serialization        | Yes     | `fingerprint.test.ts`        |
+| Config parsing + overlap validation     | Yes     | `config.test.ts`             |
+| Scanner (S3 list)                       | Yes     | `scanner.test.ts`            |
+| Uploader                                | Yes     | `uploader.test.ts`           |
+| ffmpeg transcode / probe / signature    | **No**  | Requires real binary         |
+| Full orchestrator pipeline              | **No**  | Integration test — see below |
+| Real S3 / R2 / MinIO round-trip         | **No**  | Integration test — see below |
 
 ## Integration tests
 
 Not yet implemented. A GitHub issue template exists for the MinIO integration test. When added, integration tests should:
+
 - Live in a separate package or directory (not mixed with unit tests)
 - Require a running MinIO instance (Docker)
 - Gate on an env var (e.g. `INTEGRATION=1`) so they don't run in standard `pnpm test`
@@ -62,6 +63,7 @@ Not yet implemented. A GitHub issue template exists for the MinIO integration te
 ## CI
 
 The CI job (`ci.yml`) runs:
+
 1. `pnpm --filter @s3-hsts-transcoder/lib build` — builds `lib/dist` so downstream `tsc --noEmit` can resolve types
 2. `pnpm typecheck` — all packages
 3. `pnpm build` — all packages
