@@ -26,8 +26,10 @@ interface FfprobeOutput {
 
 export async function probeSource(input: string): Promise<ProbeResult> {
   const { stdout } = await runProcess(findFfprobe(), [
-    "-v", "error",
-    "-print_format", "json",
+    "-v",
+    "error",
+    "-print_format",
+    "json",
     "-show_streams",
     "-show_format",
     input,
@@ -43,7 +45,9 @@ export async function probeSource(input: string): Promise<ProbeResult> {
   const audio = data.streams.find((s) => s.codec_type === "audio");
 
   const durationSeconds = data.format.duration ? Number(data.format.duration) : 0;
-  const bitrateKbps = data.format.bit_rate ? Math.round(Number(data.format.bit_rate) / 1000) : undefined;
+  const bitrateKbps = data.format.bit_rate
+    ? Math.round(Number(data.format.bit_rate) / 1000)
+    : undefined;
 
   const result: ProbeResult = {
     width: video.width,

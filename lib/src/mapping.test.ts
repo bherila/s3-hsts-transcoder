@@ -5,7 +5,9 @@ describe("mappingKey", () => {
   it("preserves source path under mappings/ prefix with .json suffix", () => {
     expect(mappingKey("video.mp4")).toBe("mappings/video.mp4.json");
     expect(mappingKey("a/b/c.mov")).toBe("mappings/a/b/c.mov.json");
-    expect(mappingKey("deeply/nested/path/file.mkv")).toBe("mappings/deeply/nested/path/file.mkv.json");
+    expect(mappingKey("deeply/nested/path/file.mkv")).toBe(
+      "mappings/deeply/nested/path/file.mkv.json",
+    );
   });
 });
 

@@ -42,7 +42,7 @@ Entrypoints depend on `lib` via `workspace:*` (pnpm-resolved local link; everyth
 H.264 (Main profile) + AAC, four rungs. Skips rungs above source resolution (no upscaling).
 
 | Rung  | Resolution | Video bitrate | Audio bitrate |
-|-------|------------|---------------|---------------|
+| ----- | ---------- | ------------- | ------------- |
 | 360p  | 640×360    | 800 kbps      | 96 kbps       |
 | 480p  | 854×480    | 1400 kbps     | 128 kbps      |
 | 720p  | 1280×720   | 2800 kbps     | 128 kbps      |
@@ -145,19 +145,21 @@ Lock contents:
 
 Three time values, distinct on purpose:
 
-| Value                   | Default                  | Purpose                                                                                  |
-|-------------------------|--------------------------|------------------------------------------------------------------------------------------|
-| `MAX_RUNTIME_SECONDS`   | platform-specific        | Hard ceiling on this invocation. Lambda: 900. CF/local: 3600.                            |
-| Self-imposed budget     | `MAX_RUNTIME × 0.75`     | Checked before each video. If exceeded, finish in-flight, release lock, exit.            |
-| Lock TTL                | `MAX_RUNTIME × 1.5`      | Stale-lock cutoff for crash recovery. Future runs respect lock until TTL passes.         |
+| Value                 | Default              | Purpose                                                                          |
+| --------------------- | -------------------- | -------------------------------------------------------------------------------- |
+| `MAX_RUNTIME_SECONDS` | platform-specific    | Hard ceiling on this invocation. Lambda: 900. CF/local: 3600.                    |
+| Self-imposed budget   | `MAX_RUNTIME × 0.75` | Checked before each video. If exceeded, finish in-flight, release lock, exit.    |
+| Lock TTL              | `MAX_RUNTIME × 1.5`  | Stale-lock cutoff for crash recovery. Future runs respect lock until TTL passes. |
 
 **Startup flow**:
+
 1. Conditional PUT new lock. Success → start work.
 2. Failure (lock exists) → GET lock, check `(now - startedAt)` against its `lockTtlSeconds`.
 3. Within TTL → exit immediately (no-op cron run).
 4. Past TTL → DELETE then conditional PUT (atomic; if a third worker beat us, our PUT fails, we exit).
 
 **Shutdown flow**:
+
 - Graceful (budget elapsed): DELETE lock, exit.
 - Crash: lock left to expire after TTL.
 
@@ -169,11 +171,11 @@ Redundant under the v1 single-runner global lock, but kept because it lets us sa
 
 ## Platform runtime limits
 
-| Platform                  | Max runtime per invocation                                                                                        | Lock design impact                                          |
-|---------------------------|-------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------|
-| **AWS Lambda**            | 900s (15 min) hard cap.                                                                                           | `MAX_RUNTIME=900`, budget 675s, lock TTL 1350s              |
-| **Cloudflare Containers** | No documented hard cap. 15-min `SIGTERM`→`SIGKILL` grace on shutdown. Configurable idle timeout via `sleepAfter`. | `MAX_RUNTIME=3600` default (configurable)                   |
-| **Local / Lightsail**     | None (we control it).                                                                                             | `MAX_RUNTIME=3600` default (configurable)                   |
+| Platform                  | Max runtime per invocation                                                                                        | Lock design impact                             |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **AWS Lambda**            | 900s (15 min) hard cap.                                                                                           | `MAX_RUNTIME=900`, budget 675s, lock TTL 1350s |
+| **Cloudflare Containers** | No documented hard cap. 15-min `SIGTERM`→`SIGKILL` grace on shutdown. Configurable idle timeout via `sleepAfter`. | `MAX_RUNTIME=3600` default (configurable)      |
+| **Local / Lightsail**     | None (we control it).                                                                                             | `MAX_RUNTIME=3600` default (configurable)      |
 
 Sources: [AWS Lambda quotas](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html), [Cloudflare Containers limits](https://developers.cloudflare.com/containers/platform-details/limits/).
 
@@ -192,47 +194,47 @@ Each pair JSON object:
   "source": {
     "bucket": "videos_source",
     "endpoint": "https://<account>.r2.cloudflarestorage.com",
-    "prefix": "uploads/",                // optional
-    "accessKeyId":     "...",            // bucket-level credentials (optional)
+    "prefix": "uploads/", // optional
+    "accessKeyId": "...", // bucket-level credentials (optional)
     "secretAccessKey": "...",
-    "region":          "auto"            // optional
+    "region": "auto", // optional
   },
-  "dest":   { "bucket": "videos_hsts",   "endpoint": "..." },
-  "accessKeyId":     "...",              // pair-level credentials (optional)
+  "dest": { "bucket": "videos_hsts", "endpoint": "..." },
+  "accessKeyId": "...", // pair-level credentials (optional)
   "secretAccessKey": "...",
-  "region":          "auto"
+  "region": "auto",
 }
 ```
 
 **Credential cascade per bucket:** `bucket.accessKeyId` → `pair.accessKeyId` → env var (`SOURCE_ACCESS_KEY_ID` for source side, `DEST_ACCESS_KEY_ID` for dest side). Same for `secretAccessKey` and `region`.
 
-**Overlap validation:** startup refuses to run if any source bucket overlaps with any destination bucket. Two buckets overlap when they share endpoint + bucket name AND one's prefix is a prefix of the other (including the empty prefix). Different endpoints with the same bucket name are *not* overlap. Source-vs-source and dest-vs-dest are intentionally allowed.
+**Overlap validation:** startup refuses to run if any source bucket overlaps with any destination bucket. Two buckets overlap when they share endpoint + bucket name AND one's prefix is a prefix of the other (including the empty prefix). Different endpoints with the same bucket name are _not_ overlap. Source-vs-source and dest-vs-dest are intentionally allowed.
 
-| Var                        | Required | Default          | Description                                                              |
-|----------------------------|:--------:|------------------|--------------------------------------------------------------------------|
-| `BUCKETS_CONFIG_FILE`      | no       | —                | Path to JSON file containing pair array                                  |
-| `BUCKETS_CONFIG`           | no       | —                | JSON literal containing pair array                                       |
-| `SOURCE_BUCKET`            | †        | —                | Source bucket name (single-pair fallback)                                |
-| `SOURCE_ENDPOINT`          | †        | —                | S3 endpoint URL (R2: `https://<account>.r2.cloudflarestorage.com`)       |
-| `SOURCE_ACCESS_KEY_ID`     | †        | —                | Also acts as env-level fallback in BUCKETS_CONFIG                        |
-| `SOURCE_SECRET_ACCESS_KEY` | †        | —                | Also env-level fallback                                                  |
-| `SOURCE_REGION`            | no       | `auto`           |                                                                          |
-| `SOURCE_PREFIX`            | no       | ``               | Limit scan to this prefix (single-pair fallback only)                    |
-| `DEST_BUCKET`              | †        | —                |                                                                          |
-| `DEST_ENDPOINT`            | †        | —                |                                                                          |
-| `DEST_ACCESS_KEY_ID`       | †        | —                | Env-level fallback                                                       |
-| `DEST_SECRET_ACCESS_KEY`   | †        | —                | Env-level fallback                                                       |
-| `DEST_REGION`              | no       | `auto`           |                                                                          |
-| `HLS_LADDER`               | no       | (built-in)       | JSON array overriding ABR ladder                                         |
-| `MAX_RUNTIME_SECONDS`      | no       | platform default | Self-imposed runtime budget ceiling                                      |
-| `LOCK_TTL_MULTIPLIER`      | no       | `1.5`            | Lock TTL = `MAX_RUNTIME × this`                                          |
-| `BUDGET_MULTIPLIER`        | no       | `0.75`           | Budget = `MAX_RUNTIME × this`                                            |
-| `PERCEPTUAL_THRESHOLD`     | no       | `0.95`           | Similarity score required for dedup match                                |
-| `PERCEPTUAL_DRY_RUN`       | no       | `false`          | If `true`, log would-be merges instead of acting                         |
-| `CLEANUP_DELETED_SOURCES`  | no       | `false`          | If `true`, run a refcount-aware orphan-mapping GC pass each invocation   |
-| `CLEANUP_DRY_RUN`          | no       | `false`          | If `true`, cleanup pass logs without deleting                            |
-| `MAX_CONCURRENCY`          | no       | `1`              | Source files processed in parallel within one run                        |
-| `LOG_LEVEL`                | no       | `info`           | `debug` / `info` / `warn` / `error`                                      |
+| Var                        | Required | Default          | Description                                                            |
+| -------------------------- | :------: | ---------------- | ---------------------------------------------------------------------- |
+| `BUCKETS_CONFIG_FILE`      |    no    | —                | Path to JSON file containing pair array                                |
+| `BUCKETS_CONFIG`           |    no    | —                | JSON literal containing pair array                                     |
+| `SOURCE_BUCKET`            |    †     | —                | Source bucket name (single-pair fallback)                              |
+| `SOURCE_ENDPOINT`          |    †     | —                | S3 endpoint URL (R2: `https://<account>.r2.cloudflarestorage.com`)     |
+| `SOURCE_ACCESS_KEY_ID`     |    †     | —                | Also acts as env-level fallback in BUCKETS_CONFIG                      |
+| `SOURCE_SECRET_ACCESS_KEY` |    †     | —                | Also env-level fallback                                                |
+| `SOURCE_REGION`            |    no    | `auto`           |                                                                        |
+| `SOURCE_PREFIX`            |    no    | ``               | Limit scan to this prefix (single-pair fallback only)                  |
+| `DEST_BUCKET`              |    †     | —                |                                                                        |
+| `DEST_ENDPOINT`            |    †     | —                |                                                                        |
+| `DEST_ACCESS_KEY_ID`       |    †     | —                | Env-level fallback                                                     |
+| `DEST_SECRET_ACCESS_KEY`   |    †     | —                | Env-level fallback                                                     |
+| `DEST_REGION`              |    no    | `auto`           |                                                                        |
+| `HLS_LADDER`               |    no    | (built-in)       | JSON array overriding ABR ladder                                       |
+| `MAX_RUNTIME_SECONDS`      |    no    | platform default | Self-imposed runtime budget ceiling                                    |
+| `LOCK_TTL_MULTIPLIER`      |    no    | `1.5`            | Lock TTL = `MAX_RUNTIME × this`                                        |
+| `BUDGET_MULTIPLIER`        |    no    | `0.75`           | Budget = `MAX_RUNTIME × this`                                          |
+| `PERCEPTUAL_THRESHOLD`     |    no    | `0.95`           | Similarity score required for dedup match                              |
+| `PERCEPTUAL_DRY_RUN`       |    no    | `false`          | If `true`, log would-be merges instead of acting                       |
+| `CLEANUP_DELETED_SOURCES`  |    no    | `false`          | If `true`, run a refcount-aware orphan-mapping GC pass each invocation |
+| `CLEANUP_DRY_RUN`          |    no    | `false`          | If `true`, cleanup pass logs without deleting                          |
+| `MAX_CONCURRENCY`          |    no    | `1`              | Source files processed in parallel within one run                      |
+| `LOG_LEVEL`                |    no    | `info`           | `debug` / `info` / `warn` / `error`                                    |
 
 † Required when neither `BUCKETS_CONFIG_FILE` nor `BUCKETS_CONFIG` is set.
 

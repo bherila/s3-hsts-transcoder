@@ -40,9 +40,9 @@ export interface Config {
 }
 
 export const DEFAULT_LADDER: readonly LadderRung[] = [
-  { name: "360p",  width: 640,  height: 360,  videoBitrateKbps: 800,  audioBitrateKbps: 96  },
-  { name: "480p",  width: 854,  height: 480,  videoBitrateKbps: 1400, audioBitrateKbps: 128 },
-  { name: "720p",  width: 1280, height: 720,  videoBitrateKbps: 2800, audioBitrateKbps: 128 },
+  { name: "360p", width: 640, height: 360, videoBitrateKbps: 800, audioBitrateKbps: 96 },
+  { name: "480p", width: 854, height: 480, videoBitrateKbps: 1400, audioBitrateKbps: 128 },
+  { name: "720p", width: 1280, height: 720, videoBitrateKbps: 2800, audioBitrateKbps: 128 },
   { name: "1080p", width: 1920, height: 1080, videoBitrateKbps: 5000, audioBitrateKbps: 192 },
 ];
 
@@ -79,10 +79,18 @@ export function loadConfig(platform: Platform): Config {
   return {
     pairs,
     ladder: parseLadder(process.env.HLS_LADDER),
-    maxRuntimeSeconds: parseNumber("MAX_RUNTIME_SECONDS", process.env.MAX_RUNTIME_SECONDS, platformDefaultRuntime),
+    maxRuntimeSeconds: parseNumber(
+      "MAX_RUNTIME_SECONDS",
+      process.env.MAX_RUNTIME_SECONDS,
+      platformDefaultRuntime,
+    ),
     lockTtlMultiplier: parseNumber("LOCK_TTL_MULTIPLIER", process.env.LOCK_TTL_MULTIPLIER, 1.5),
     budgetMultiplier: parseNumber("BUDGET_MULTIPLIER", process.env.BUDGET_MULTIPLIER, 0.75),
-    perceptualThreshold: parseNumber("PERCEPTUAL_THRESHOLD", process.env.PERCEPTUAL_THRESHOLD, 0.95),
+    perceptualThreshold: parseNumber(
+      "PERCEPTUAL_THRESHOLD",
+      process.env.PERCEPTUAL_THRESHOLD,
+      0.95,
+    ),
     perceptualDryRun: process.env.PERCEPTUAL_DRY_RUN === "true",
     cleanupDeletedSources: process.env.CLEANUP_DELETED_SOURCES === "true",
     cleanupDryRun: process.env.CLEANUP_DRY_RUN === "true",
@@ -117,7 +125,9 @@ function parseBucketsConfigJson(raw: string, sourceName: string): BucketPair[] {
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    throw new Error(`${sourceName} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(
+      `${sourceName} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
   if (!Array.isArray(parsed) || parsed.length === 0) {
     throw new Error(`${sourceName} must be a non-empty JSON array of bucket pairs`);
@@ -149,7 +159,9 @@ function resolveBucket(
     throw new Error(`${sourceName}[${idx}].${side}.bucket is required`);
   }
   if (!bucket.endpoint) {
-    throw new Error(`${sourceName}[${idx}].${side}.endpoint is required for bucket '${bucket.bucket}'`);
+    throw new Error(
+      `${sourceName}[${idx}].${side}.endpoint is required for bucket '${bucket.bucket}'`,
+    );
   }
 
   // Credential cascade: bucket-level → pair-level → env-level.
@@ -158,8 +170,7 @@ function resolveBucket(
     bucket.accessKeyId ?? pair.accessKeyId ?? process.env[`${envPrefix}_ACCESS_KEY_ID`];
   const secretAccessKey =
     bucket.secretAccessKey ?? pair.secretAccessKey ?? process.env[`${envPrefix}_SECRET_ACCESS_KEY`];
-  const region =
-    bucket.region ?? pair.region ?? process.env[`${envPrefix}_REGION`] ?? "auto";
+  const region = bucket.region ?? pair.region ?? process.env[`${envPrefix}_REGION`] ?? "auto";
 
   if (!accessKeyId || !secretAccessKey) {
     throw new Error(
@@ -264,7 +275,8 @@ function parseLadder(raw: string | undefined): LadderRung[] {
   }
   for (const rung of parsed) {
     if (
-      typeof rung !== "object" || rung === null ||
+      typeof rung !== "object" ||
+      rung === null ||
       typeof rung.name !== "string" ||
       typeof rung.width !== "number" ||
       typeof rung.height !== "number" ||

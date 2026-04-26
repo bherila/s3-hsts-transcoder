@@ -1,8 +1,4 @@
-import {
-  DeleteObjectCommand,
-  ListObjectsV2Command,
-  type S3Client,
-} from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, ListObjectsV2Command, type S3Client } from "@aws-sdk/client-s3";
 import { deleteByIdDirectory } from "./dest.js";
 import { deleteFingerprint, removeIndexEntry } from "./fingerprintIndex.js";
 import type { Logger } from "./logger.js";
@@ -46,11 +42,7 @@ export interface CleanupResult {
  * bucket.
  */
 export async function runCleanupPass(opts: CleanupOptions): Promise<CleanupResult> {
-  const {
-    sourceClient, destClient,
-    sourceBucket, destBucket, sourcePrefix,
-    logger, dryRun,
-  } = opts;
+  const { sourceClient, destClient, sourceBucket, destBucket, sourcePrefix, logger, dryRun } = opts;
 
   logger.info("cleanup: enumerating live source keys", { sourceBucket });
   const liveSources = new Set<string>();
@@ -63,14 +55,20 @@ export async function runCleanupPass(opts: CleanupOptions): Promise<CleanupResul
   logger.info("cleanup: live source count", { count: liveSources.size });
 
   const orphans = await findOrphanMappings({
-    destClient, destBucket, sourcePrefix, liveSources,
+    destClient,
+    destBucket,
+    sourcePrefix,
+    liveSources,
   });
 
   if (orphans.length === 0) {
     logger.info("cleanup: no orphan mappings");
     return {
-      orphanMappingsFound: 0, orphanMappingsDeleted: 0,
-      contentIdsGcd: 0, contentIdsRetained: 0, objectsDeleted: 0,
+      orphanMappingsFound: 0,
+      orphanMappingsDeleted: 0,
+      contentIdsGcd: 0,
+      contentIdsRetained: 0,
+      objectsDeleted: 0,
     };
   }
 
@@ -159,7 +157,10 @@ async function findOrphanMappings(args: {
 
     for (const obj of res.Contents ?? []) {
       if (!obj.Key || !obj.Key.endsWith(MAPPING_SUFFIX)) continue;
-      const sourceKey = obj.Key.slice(MAPPING_PREFIX.length, obj.Key.length - MAPPING_SUFFIX.length);
+      const sourceKey = obj.Key.slice(
+        MAPPING_PREFIX.length,
+        obj.Key.length - MAPPING_SUFFIX.length,
+      );
       if (sourcePrefix && !sourceKey.startsWith(sourcePrefix)) continue;
       if (liveSources.has(sourceKey)) continue;
 

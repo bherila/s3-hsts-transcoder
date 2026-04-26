@@ -118,9 +118,7 @@ async function tryPut(opts: AcquireOptions, key: string): Promise<LockHandle | n
     workerId,
     release: async () => {
       try {
-        await opts.client.send(
-          new DeleteObjectCommand({ Bucket: opts.bucket, Key: key }),
-        );
+        await opts.client.send(new DeleteObjectCommand({ Bucket: opts.bucket, Key: key }));
         opts.logger.info("released lock", { key, workerId });
       } catch (err) {
         opts.logger.warn("failed to release lock; will expire after TTL", {
@@ -133,11 +131,7 @@ async function tryPut(opts: AcquireOptions, key: string): Promise<LockHandle | n
   };
 }
 
-async function readLock(
-  client: S3Client,
-  bucket: string,
-  key: string,
-): Promise<LockBody | null> {
+async function readLock(client: S3Client, bucket: string, key: string): Promise<LockBody | null> {
   try {
     const res = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
     if (!res.Body) return null;
@@ -154,10 +148,7 @@ async function readLock(
  * platform-imposed kill so its successor doesn't fight a still-running peer,
  * while bounding the wait for crash recovery.
  */
-export function computeLockTtlSeconds(
-  maxRuntimeSeconds: number,
-  multiplier: number,
-): number {
+export function computeLockTtlSeconds(maxRuntimeSeconds: number, multiplier: number): number {
   return Math.ceil(maxRuntimeSeconds * multiplier);
 }
 
@@ -166,9 +157,6 @@ export function computeLockTtlSeconds(
  * videos once budget is exhausted, so they can release the lock cleanly
  * before the platform kills them.
  */
-export function computeBudgetSeconds(
-  maxRuntimeSeconds: number,
-  multiplier: number,
-): number {
+export function computeBudgetSeconds(maxRuntimeSeconds: number, multiplier: number): number {
   return Math.floor(maxRuntimeSeconds * multiplier);
 }

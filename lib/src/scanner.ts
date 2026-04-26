@@ -8,8 +8,20 @@ export interface SourceObject {
 }
 
 const VIDEO_EXTENSIONS: ReadonlySet<string> = new Set([
-  "mp4", "mov", "mkv", "webm", "avi", "m4v",
-  "mpg", "mpeg", "wmv", "flv", "ogv", "3gp", "ts", "m2ts",
+  "mp4",
+  "mov",
+  "mkv",
+  "webm",
+  "avi",
+  "m4v",
+  "mpg",
+  "mpeg",
+  "wmv",
+  "flv",
+  "ogv",
+  "3gp",
+  "ts",
+  "m2ts",
 ]);
 
 export function isVideoKey(key: string): boolean {

@@ -25,11 +25,11 @@ The global lock in the destination bucket prevents overlapping runs even if the 
 
 Lightsail is well-suited: fixed monthly price, generous bandwidth allowance, simple cron, and ffmpeg installs cleanly.
 
-| Use case                                | Plan       | Specs                                                        |
-|-----------------------------------------|------------|--------------------------------------------------------------|
-| Occasional, short videos                | $12/mo     | 2 vCPU (burstable), 2 GB RAM, 60 GB SSD, 3 TB transfer       |
-| **Daily/weekly cron, mixed lengths**    | **$24/mo** | 2 vCPU, 4 GB RAM, 80 GB SSD, 4 TB transfer ← **default**     |
-| Many videos / long videos / faster turn | $84/mo     | 4 vCPU, 16 GB RAM, 320 GB SSD, 6 TB transfer                 |
+| Use case                                | Plan       | Specs                                                    |
+| --------------------------------------- | ---------- | -------------------------------------------------------- |
+| Occasional, short videos                | $12/mo     | 2 vCPU (burstable), 2 GB RAM, 60 GB SSD, 3 TB transfer   |
+| **Daily/weekly cron, mixed lengths**    | **$24/mo** | 2 vCPU, 4 GB RAM, 80 GB SSD, 4 TB transfer ← **default** |
+| Many videos / long videos / faster turn | $84/mo     | 4 vCPU, 16 GB RAM, 320 GB SSD, 6 TB transfer             |
 
 Notes:
 

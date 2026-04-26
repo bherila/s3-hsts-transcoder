@@ -19,7 +19,7 @@ CMAF segments produced in v1 are DASH-compatible. Adding DASH = generate a `.mpd
 
 The cleanup pass (`CLEANUP_DELETED_SOURCES=true`) handles the common case: when sources are deleted, refcount-aware GC removes `by-id/<id>/` once no live mappings reference it.
 
-What's *still* deferred: a defensive sweep that enumerates `by-id/*/` and removes directories with **zero** mapping references — to recover from corrupted state (interrupted upload that wrote segments but no mapping; manually-deleted mappings; tooling bugs). Implementation:
+What's _still_ deferred: a defensive sweep that enumerates `by-id/*/` and removes directories with **zero** mapping references — to recover from corrupted state (interrupted upload that wrote segments but no mapping; manually-deleted mappings; tooling bugs). Implementation:
 
 1. Enumerate `mappings/*.json` → set of referenced content IDs.
 2. Enumerate `by-id/*/` directories.

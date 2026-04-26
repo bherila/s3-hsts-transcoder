@@ -3,11 +3,7 @@ import { existsSync } from "node:fs";
 let cachedFfmpeg: string | null = null;
 let cachedFfprobe: string | null = null;
 
-const FFMPEG_CANDIDATES = [
-  "/usr/local/bin/ffmpeg",
-  "/usr/bin/ffmpeg",
-  "/opt/homebrew/bin/ffmpeg",
-];
+const FFMPEG_CANDIDATES = ["/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg", "/opt/homebrew/bin/ffmpeg"];
 
 const FFPROBE_CANDIDATES = [
   "/usr/local/bin/ffprobe",

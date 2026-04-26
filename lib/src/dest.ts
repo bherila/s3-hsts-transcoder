@@ -17,9 +17,7 @@ export async function transcodedOutputExists(
   contentId: string,
 ): Promise<boolean> {
   try {
-    await client.send(
-      new HeadObjectCommand({ Bucket: bucket, Key: masterPlaylistKey(contentId) }),
-    );
+    await client.send(new HeadObjectCommand({ Bucket: bucket, Key: masterPlaylistKey(contentId) }));
     return true;
   } catch (err) {
     if (isNotFound(err)) return false;

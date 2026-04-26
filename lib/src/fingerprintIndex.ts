@@ -96,9 +96,7 @@ export async function deleteFingerprint(
   contentId: string,
 ): Promise<void> {
   try {
-    await client.send(
-      new DeleteObjectCommand({ Bucket: bucket, Key: fingerprintKey(contentId) }),
-    );
+    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: fingerprintKey(contentId) }));
   } catch (err) {
     if (isNotFound(err)) return;
     throw err;

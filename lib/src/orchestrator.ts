@@ -87,8 +87,11 @@ export async function runOnce(opts: OrchestratorOptions): Promise<RunSummary> {
 
     try {
       const result = await runPair({
-        pair, config, logger,
-        sourceClient, destClient,
+        pair,
+        config,
+        logger,
+        sourceClient,
+        destClient,
         lockTtlSeconds: lockTtl,
         budgetEndsAt,
         pairIndex: i,
@@ -114,7 +117,11 @@ export async function runOnce(opts: OrchestratorOptions): Promise<RunSummary> {
   }
 
   const summary: RunSummary = {
-    processed, cached, deduped, busy, failed,
+    processed,
+    cached,
+    deduped,
+    busy,
+    failed,
     durationMs: Date.now() - startedAt,
     pairsProcessed,
     totalPairs: config.pairs.length,
@@ -143,8 +150,14 @@ async function runPair(args: {
   pairIndex: number;
 }): Promise<PairResult> {
   const {
-    pair, config, logger, sourceClient, destClient,
-    lockTtlSeconds, budgetEndsAt, pairIndex,
+    pair,
+    config,
+    logger,
+    sourceClient,
+    destClient,
+    lockTtlSeconds,
+    budgetEndsAt,
+    pairIndex,
   } = args;
 
   const lock = await acquireLock({
@@ -179,13 +192,23 @@ async function runPair(args: {
     for await (const source of scanSource(sourceClient, pair.source.bucket, scanOpts)) {
       if (Date.now() > budgetEndsAt) {
         logger.info("budget exhausted in pair", {
-          pairIndex, processed, cached, deduped, busy, failed,
+          pairIndex,
+          processed,
+          cached,
+          deduped,
+          busy,
+          failed,
         });
         break;
       }
       try {
         const result = await processSource({
-          source, pair, config, sourceClient, destClient, logger,
+          source,
+          pair,
+          config,
+          sourceClient,
+          destClient,
+          logger,
         });
         if (result === "transcoded") processed++;
         else if (result === "deduped") deduped++;
@@ -256,11 +279,16 @@ async function processSource(args: {
     // 2. Download + hash.
     logger.info("downloading", { sourceKey: source.key, sizeBytes: source.size });
     const { sha256, bytes } = await downloadAndHash(
-      sourceClient, pair.source.bucket, source.key, localSource,
+      sourceClient,
+      pair.source.bucket,
+      source.key,
+      localSource,
     );
     if (bytes !== source.size) {
       logger.warn("downloaded size differs from listing", {
-        sourceKey: source.key, listed: source.size, downloaded: bytes,
+        sourceKey: source.key,
+        listed: source.size,
+        downloaded: bytes,
       });
     }
     const contentId = formatContentId("sha256", sha256);
@@ -292,7 +320,8 @@ async function processSource(args: {
       const probe = await probeSource(localSource);
       logger.info("probed source", {
         sourceKey: source.key,
-        width: probe.width, height: probe.height,
+        width: probe.width,
+        height: probe.height,
         durationSeconds: Math.round(probe.durationSeconds),
         hasAudio: probe.hasAudio,
       });
@@ -306,7 +335,10 @@ async function processSource(args: {
 
       // 8. Perceptual match.
       const match = await findPerceptualMatch(
-        destClient, pair.dest.bucket, fingerprint, config.perceptualThreshold,
+        destClient,
+        pair.dest.bucket,
+        fingerprint,
+        config.perceptualThreshold,
       );
       let pendingRepointFrom: string | null = null;
       if (match) {
@@ -315,19 +347,18 @@ async function processSource(args: {
           sourceKey: source.key,
           matchedContentId: match.contentId,
           similarity: Number(match.similarity.toFixed(3)),
-          stored: { width: match.entry.width, height: match.entry.height,
-                    videoBitrateKbps: match.entry.videoBitrateKbps },
-          incoming: { width: probe.width, height: probe.height,
-                      bitrateKbps: probe.bitrateKbps },
+          stored: {
+            width: match.entry.width,
+            height: match.entry.height,
+            videoBitrateKbps: match.entry.videoBitrateKbps,
+          },
+          incoming: { width: probe.width, height: probe.height, bitrateKbps: probe.bitrateKbps },
           incomingHigherQuality: incomingHigher,
           dryRun: config.perceptualDryRun,
         });
         if (!config.perceptualDryRun) {
           if (!incomingHigher) {
-            await writeMapping(
-              destClient, pair.dest.bucket,
-              buildMapping(source, match.contentId),
-            );
+            await writeMapping(destClient, pair.dest.bucket, buildMapping(source, match.contentId));
             return "deduped";
           }
           pendingRepointFrom = match.contentId;
@@ -338,7 +369,10 @@ async function processSource(args: {
       const outputDir = path.join(tempDir, "hls");
       logger.info("transcoding", { sourceKey: source.key });
       await transcodeToHls({
-        input: localSource, outputDir, ladder: effectiveLadder, hasAudio: probe.hasAudio,
+        input: localSource,
+        outputDir,
+        ladder: effectiveLadder,
+        hasAudio: probe.hasAudio,
       });
 
       // 10. Upload HLS tree.
@@ -352,7 +386,9 @@ async function processSource(args: {
 
       // 11. Fingerprint + index.
       await uploadFingerprint(
-        destClient, pair.dest.bucket, contentId,
+        destClient,
+        pair.dest.bucket,
+        contentId,
         serializeFingerprint(fingerprint),
       );
       const indexEntry: FingerprintIndexEntry = {
@@ -447,7 +483,9 @@ async function repointAndGc(args: {
   const { destClient, bucket, oldContentId, newContentId, logger } = args;
   const sourceKeys = await findMappingsForContentId(destClient, bucket, oldContentId);
   logger.info("repointing mappings to new transcoded output", {
-    oldContentId, newContentId, mappingCount: sourceKeys.length,
+    oldContentId,
+    newContentId,
+    mappingCount: sourceKeys.length,
   });
 
   for (const sourceKey of sourceKeys) {
@@ -467,6 +505,8 @@ async function repointAndGc(args: {
   await deleteFingerprint(destClient, bucket, oldContentId);
   await removeIndexEntry(destClient, bucket, oldContentId);
   logger.info("perceptual upgrade complete", {
-    oldContentId, newContentId, deletedObjects: deletedCount,
+    oldContentId,
+    newContentId,
+    deletedObjects: deletedCount,
   });
 }

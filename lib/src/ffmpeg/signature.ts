@@ -12,9 +12,12 @@ import { findFfmpeg } from "./binary.js";
 export async function extractSignature(input: string, outFile: string): Promise<void> {
   await runProcess(findFfmpeg(), [
     "-y",
-    "-i", input,
-    "-vf", `signature=format=binary:filename=${outFile}`,
-    "-f", "null",
+    "-i",
+    input,
+    "-vf",
+    `signature=format=binary:filename=${outFile}`,
+    "-f",
+    "null",
     "-",
   ]);
 }

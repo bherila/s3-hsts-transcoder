@@ -27,10 +27,14 @@ export async function fingerprintVideo(
 ): Promise<VideoFingerprint> {
   const ffmpeg = findFfmpeg();
   const args = [
-    "-i", input,
-    "-vf", `fps=1/${intervalSeconds},scale=${FRAME_W}:${FRAME_H}:flags=lanczos,format=gray`,
-    "-f", "rawvideo",
-    "-pix_fmt", "gray",
+    "-i",
+    input,
+    "-vf",
+    `fps=1/${intervalSeconds},scale=${FRAME_W}:${FRAME_H}:flags=lanczos,format=gray`,
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "gray",
     "-",
   ];
 

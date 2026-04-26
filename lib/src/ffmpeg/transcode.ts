@@ -60,16 +60,26 @@ function buildHlsArgs(opts: TranscodeOptions): string[] {
   // Per-rung video encoding.
   ladder.forEach((rung, i) => {
     args.push(
-      "-map", `[s${i}]`,
-      `-c:v:${i}`, "libx264",
-      `-b:v:${i}`, `${rung.videoBitrateKbps}k`,
-      `-maxrate:v:${i}`, `${Math.round(rung.videoBitrateKbps * 1.07)}k`,
-      `-bufsize:v:${i}`, `${rung.videoBitrateKbps * 2}k`,
-      `-profile:v:${i}`, "main",
-      `-preset:v:${i}`, "fast",
-      `-g:v:${i}`, String(gopSize),
-      `-keyint_min:v:${i}`, String(gopSize),
-      `-sc_threshold:v:${i}`, "0",
+      "-map",
+      `[s${i}]`,
+      `-c:v:${i}`,
+      "libx264",
+      `-b:v:${i}`,
+      `${rung.videoBitrateKbps}k`,
+      `-maxrate:v:${i}`,
+      `${Math.round(rung.videoBitrateKbps * 1.07)}k`,
+      `-bufsize:v:${i}`,
+      `${rung.videoBitrateKbps * 2}k`,
+      `-profile:v:${i}`,
+      "main",
+      `-preset:v:${i}`,
+      "fast",
+      `-g:v:${i}`,
+      String(gopSize),
+      `-keyint_min:v:${i}`,
+      String(gopSize),
+      `-sc_threshold:v:${i}`,
+      "0",
     );
   });
 
@@ -77,10 +87,14 @@ function buildHlsArgs(opts: TranscodeOptions): string[] {
   if (hasAudio) {
     ladder.forEach((rung, i) => {
       args.push(
-        "-map", "0:a:0",
-        `-c:a:${i}`, "aac",
-        `-b:a:${i}`, `${rung.audioBitrateKbps}k`,
-        `-ac:a:${i}`, "2",
+        "-map",
+        "0:a:0",
+        `-c:a:${i}`,
+        "aac",
+        `-b:a:${i}`,
+        `${rung.audioBitrateKbps}k`,
+        `-ac:a:${i}`,
+        "2",
       );
     });
   }
@@ -91,14 +105,22 @@ function buildHlsArgs(opts: TranscodeOptions): string[] {
     .join(" ");
 
   args.push(
-    "-f", "hls",
-    "-hls_time", String(segmentSeconds),
-    "-hls_playlist_type", "vod",
-    "-hls_segment_type", "fmp4",
-    "-hls_flags", "independent_segments",
-    "-hls_segment_filename", path.join(outputDir, "%v", "seg_%05d.m4s"),
-    "-master_pl_name", "master.m3u8",
-    "-var_stream_map", varStreamMap,
+    "-f",
+    "hls",
+    "-hls_time",
+    String(segmentSeconds),
+    "-hls_playlist_type",
+    "vod",
+    "-hls_segment_type",
+    "fmp4",
+    "-hls_flags",
+    "independent_segments",
+    "-hls_segment_filename",
+    path.join(outputDir, "%v", "seg_%05d.m4s"),
+    "-master_pl_name",
+    "master.m3u8",
+    "-var_stream_map",
+    varStreamMap,
     path.join(outputDir, "%v", "index.m3u8"),
   );
 

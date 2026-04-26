@@ -23,11 +23,11 @@ Node.js + TypeScript + pnpm workspaces. ffmpeg is required at runtime (vendored 
 
 ## Quick reference
 
-| Want to                                        | Go to                                |
-|------------------------------------------------|--------------------------------------|
-| Understand the architecture                    | [PLAN.md](./PLAN.md)                 |
-| See deferred features                          | [FUTURE.md](./FUTURE.md)             |
-| Run the transcoder on Lambda                   | [aws/README.md](./aws/README.md)     |
-| Run the transcoder on Cloudflare               | [cloudflare/README.md](./cloudflare/README.md) |
-| Run the transcoder locally / on VPS / Lightsail| [local/README.md](./local/README.md) |
-| Develop or test the shared lib                 | [lib/README.md](./lib/README.md)     |
+| Want to                                         | Go to                                          |
+| ----------------------------------------------- | ---------------------------------------------- |
+| Understand the architecture                     | [PLAN.md](./PLAN.md)                           |
+| See deferred features                           | [FUTURE.md](./FUTURE.md)                       |
+| Run the transcoder on Lambda                    | [aws/README.md](./aws/README.md)               |
+| Run the transcoder on Cloudflare                | [cloudflare/README.md](./cloudflare/README.md) |
+| Run the transcoder locally / on VPS / Lightsail | [local/README.md](./local/README.md)           |
+| Develop or test the shared lib                  | [lib/README.md](./lib/README.md)               |

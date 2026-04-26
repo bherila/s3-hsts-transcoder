@@ -64,7 +64,13 @@ curl -X POST 'http://localhost:9000/2015-03-31/functions/function/invocations' -
     },
     {
       "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:HeadObject"],
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket",
+        "s3:HeadObject"
+      ],
       "Resource": ["arn:aws:s3:::DEST_BUCKET", "arn:aws:s3:::DEST_BUCKET/*"]
     },
     {
